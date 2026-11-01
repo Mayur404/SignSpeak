@@ -1,0 +1,22 @@
+# Local Python environment and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# Personal recordings, trained model, and local settings
+data/*
+!data/.gitkeep
+
+# Editor and OS metadata
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
