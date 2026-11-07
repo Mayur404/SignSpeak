@@ -100,6 +100,74 @@ class _Pyttsx3Backend:
             on_done()
 
 
+class _WinRTBackend:
+    """Windows' installed natural voices, including offline Narrator voices."""
+
+    def __init__(self) -> None:
+        import asyncio
+
+        from winrt.windows.media.playback import MediaPlayer, MediaPlayerAudioCategory
+        from winrt.windows.media.speechsynthesis import SpeechSynthesizer
+
+        self._asyncio = asyncio
+        self.synth = SpeechSynthesizer()
+        self._voices = list(SpeechSynthesizer.all_voices)
+        self.voices = [
+            {
+                "id": str(voice.id),
+                "name": f"{voice.display_name} ({voice.language})",
+                "language": str(voice.language),
+            }
+            for voice in self._voices
+        ]
+        self.player = MediaPlayer()
+        self.player.audio_category = MediaPlayerAudioCategory.SPEECH
+        self._loop = None
+        self._ended_event = None
+        self.player.add_media_ended(self._on_media_ended)
+
+    def _on_media_ended(self, _sender, _args) -> None:
+        if self._loop is not None and self._ended_event is not None:
+            self._loop.call_soon_threadsafe(self._ended_event.set)
+
+    def apply(self, voice_id: str, rate: int, volume: int) -> None:
+        if voice_id:
+            for voice in self._voices:
+                if str(voice.id) == voice_id:
+                    self.synth.voice = voice
+                    break
+        self.player.playback_rate = max(0.7, min(1.4, 1.0 + int(rate) * 0.035))
+        self.player.volume = max(0.0, min(1.0, int(volume) / 100.0))
+
+    def speak(self, text: str, cancel: threading.Event, on_start, on_done) -> None:
+        async def play() -> None:
+            stream = await self.synth.synthesize_text_to_stream_async(text)
+            loop = self._asyncio.get_running_loop()
+            ended = self._asyncio.Event()
+            self._loop, self._ended_event = loop, ended
+            self.player.set_stream_source(stream)
+            self.player.play()
+            on_start()
+            while not ended.is_set() and not cancel.is_set():
+                await self._asyncio.sleep(0.04)
+            if cancel.is_set():
+                self.player.pause()
+
+        try:
+            self._asyncio.run(play())
+        finally:
+            self._loop = None
+            self._ended_event = None
+            on_done()
+
+    def close(self) -> None:
+        try:
+            self.player.close()
+            self.synth.close()
+        except Exception:
+            pass
+
+
 class SpeechWorker(QThread):
     voicesReady = Signal(list)
     speakingChanged = Signal(bool)
@@ -147,17 +215,22 @@ class SpeechWorker(QThread):
 
     def run(self) -> None:
         backend = None
-        try:
-            if sys.platform == "win32":
-                backend = _SapiBackend()
-            else:
-                backend = _Pyttsx3Backend()
-        except Exception:
+        if sys.platform == "win32":
+            try:
+                backend = _WinRTBackend()
+            except Exception:
+                try:
+                    backend = _SapiBackend()
+                except Exception:
+                    backend = None
+        else:
             try:
                 backend = _Pyttsx3Backend()
-            except Exception as exc:
-                self.failed.emit(f"Speech is unavailable: {exc}")
-                return
+            except Exception:
+                backend = None
+        if backend is None:
+            self.failed.emit("Speech is unavailable. Check your installed Windows voices.")
+            return
         try:
             self.voicesReady.emit(backend.voices)
         except Exception:
@@ -185,6 +258,9 @@ class SpeechWorker(QThread):
             except Exception as exc:
                 self.failed.emit(f"Speech failed: {exc}")
                 self.speakingChanged.emit(False)
+        close = getattr(backend, "close", None)
+        if close is not None:
+            close()
 
 
 class SpeechEngine(QObject):

@@ -85,6 +85,7 @@ class MainWindow(QMainWindow):
         self._cameras: list[tuple[int, str]] = [(self.settings.camera_index, f"Camera {self.settings.camera_index}")]
         self._start_camera_when_ready = start_camera
         self._camera_started = False
+        self._camera_restart_pending = False
         self._probe: CameraProbe | None = None
 
         self.setWindowTitle("SignSpeak — Sign Language to Speech")
@@ -108,7 +109,8 @@ class MainWindow(QMainWindow):
             self._set_side(self.side_speech, "Off", theme.FAINT)
 
         if start_camera:
-            self._probe = CameraProbe(self.settings.camera_index, self)
+            current_cam = self.settings.camera_source if self.settings.camera_source else self.settings.camera_index
+            self._probe = CameraProbe(current_cam, self)
             self._probe.finishedList.connect(self._on_cameras_found)
             self._probe.start()
             QTimer.singleShot(250, self._start_camera_if_needed)
@@ -281,6 +283,7 @@ class MainWindow(QMainWindow):
         tp.backspace.connect(self.on_backspace)
         tp.space.connect(self.on_space)
         tp.clear_word.connect(self.on_clear_word)
+        tp.delete_word.connect(self.on_delete_word)
         tp.clear_all.connect(self.on_clear_all)
         tp.pause_toggled.connect(self.on_pause)
         tp.mirror_toggled.connect(lambda value: self.update_setting("mirror", value))
@@ -321,7 +324,7 @@ class MainWindow(QMainWindow):
             ("Return", self.manual_commit),
             ("Ctrl+Return", self.toggle_speech),
             ("Backspace", self.on_backspace),
-            ("Ctrl+Backspace", self.on_clear_word),
+            ("Ctrl+Backspace", self.on_delete_word),
             ("Esc", self.toggle_pause),
             ("Ctrl+R", self.on_clear_all),
         ]
@@ -336,18 +339,20 @@ class MainWindow(QMainWindow):
     def _on_cameras_found(self, cameras: list) -> None:
         if self._closing:
             return
-        found = [(int(index), str(name)) for index, name in cameras]
-        if not found:
-            found = [(self.settings.camera_index, f"Camera {self.settings.camera_index}")]
-        if self.settings.camera_index not in [index for index, _ in found]:
-            found.append((self.settings.camera_index, f"Camera {self.settings.camera_index}"))
-        self._cameras = sorted(set(found))
+        found = [(item[0], str(item[1])) for item in cameras]
+        current = self.settings.camera_source if self.settings.camera_source else self.settings.camera_index
+        keys = [item[0] for item in found]
+        if current not in keys:
+            label = "Sparsh CCTV" if "192.168.128.10" in str(current) else f"Camera {current}"
+            found.insert(0, (current, label))
+        self._cameras = found
         self._sync_camera_combos()
         self._start_camera_if_needed()
 
     def _sync_camera_combos(self) -> None:
-        self.translate_page.set_cameras(self._cameras, self.settings.camera_index)
-        self.settings_page.set_cameras(self._cameras, self.settings.camera_index)
+        current = self.settings.camera_source if self.settings.camera_source else self.settings.camera_index
+        self.translate_page.set_cameras(self._cameras, current)
+        self.settings_page.set_cameras(self._cameras, current)
 
     def _start_camera_if_needed(self) -> None:
         if not self._start_camera_when_ready or self._camera_started or self._closing:
@@ -386,24 +391,53 @@ class MainWindow(QMainWindow):
         self.worker.recordingFinished.connect(self.on_recording_finished)
         self.worker.start()
 
-    def stop_camera(self) -> None:
+    def stop_camera(self) -> bool:
         if self.worker is None:
-            return
+            return True
         self._ignore_stopped_until = time.monotonic() + 1.2
-        worker, self.worker = self.worker, None
-        worker.stop()
+        worker = self.worker
+        stopped = worker.stop(8000)
+        if not stopped:
+            return False
+        self._camera_restart_pending = False
+        self.worker = None
         worker.deleteLater()
         self._camera_live = False
+        return True
 
     def restart_camera(self) -> None:
         self._start_camera_when_ready = True
         self._camera_started = True
-        self.stop_camera()
+        if not self.stop_camera():
+            worker = self.worker
+            if worker is not None:
+                if not worker.isRunning():
+                    self._camera_restart_pending = False
+                    self.worker = None
+                    worker.deleteLater()
+                    self._camera_started = False
+                    self.start_camera()
+                elif not self._camera_restart_pending:
+                    self._camera_restart_pending = True
+                    worker.finished.connect(self._restart_after_worker_stops)
+            return
         self._camera_started = False
         self.start_camera()
 
-    def on_camera_changed(self, index: int) -> None:
-        self.update_setting("camera_index", index)
+    def _restart_after_worker_stops(self) -> None:
+        if self.sender() is not self.worker:
+            return
+        self._camera_restart_pending = False
+        if self._closing:
+            return
+        worker, self.worker = self.worker, None
+        if worker is not None:
+            worker.deleteLater()
+        self._camera_started = False
+        self.start_camera()
+
+    def on_camera_changed(self, source: object) -> None:
+        self.update_setting("camera_source", source)
 
     def _on_camera_status(self, status: str) -> None:
         if self._closing:
@@ -503,6 +537,10 @@ class MainWindow(QMainWindow):
         if self.composer.clear_word():
             self._update_text_ui()
 
+    def on_delete_word(self) -> None:
+        if self.composer.delete_word():
+            self._update_text_ui()
+
     def on_clear_all(self) -> None:
         if self.speech is not None:
             self.speech.stop()
@@ -545,7 +583,25 @@ class MainWindow(QMainWindow):
         self.speech.start()
 
     def _on_voices(self, voices: list) -> None:
-        self.settings_page.set_voices(voices, self.settings.tts_voice)
+        voice_id = self.settings.tts_voice
+        if not voice_id:
+            indian_voice = next(
+                (
+                    voice for voice in voices
+                    if str(voice.get("language", "")).lower() == "en-in"
+                    or any(
+                        marker in str(voice.get("name", "")).lower()
+                        for marker in ("neerja", "prabhat", "english (india)")
+                    )
+                ),
+                None,
+            )
+            if indian_voice:
+                voice_id = str(indian_voice.get("id", ""))
+                if voice_id:
+                    self.settings.tts_voice = voice_id
+                    self._schedule_save()
+        self.settings_page.set_voices(voices, voice_id)
         self._set_side(self.side_speech, "Ready", theme.GREEN)
 
     def _on_speaking(self, speaking: bool) -> None:
@@ -716,11 +772,17 @@ class MainWindow(QMainWindow):
     # Settings
     # ------------------------------------------------------------------
     def update_setting(self, key: str, value) -> None:
-        if key == "camera_index":
-            value = int(value)
-            if value == self.settings.camera_index:
-                return
-            self.settings.camera_index = value
+        if key in ("camera_index", "camera_source"):
+            if isinstance(value, str) and (value.startswith("rtsp://") or value.startswith("http://")):
+                if self.settings.camera_source == value:
+                    return
+                self.settings.camera_source = value
+            else:
+                val = int(value)
+                if not self.settings.camera_source and self.settings.camera_index == val:
+                    return
+                self.settings.camera_index = val
+                self.settings.camera_source = ""
             self._save_settings()
             self._sync_camera_combos()
             self.restart_camera()
@@ -839,14 +901,20 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):  # noqa: N802
         self._closing = True
         self._save_settings()
-        if self.worker is not None:
-            self.worker.stop()
-            self.worker = None
-        if self._probe is not None and self._probe.isRunning():
-            self._probe.wait(2500)
-        if self._training_thread is not None and self._training_thread.isRunning():
-            self._training_thread.wait(5000)
+        worker_stopped = self.stop_camera()
+        probe_running = self._probe is not None and self._probe.isRunning()
+        training_running = (
+            self._training_thread is not None and self._training_thread.isRunning()
+        )
+        if not worker_stopped or probe_running or training_running:
+            event.ignore()
+            QTimer.singleShot(150, self._retry_close_when_threads_stop)
+            return
         if self.speech is not None:
             self.speech.shutdown()
         shutdown_tracker()
         super().closeEvent(event)
+
+    def _retry_close_when_threads_stop(self) -> None:
+        if self._closing:
+            self.close()

@@ -7,7 +7,8 @@ from pathlib import Path
 import numpy as np
 
 from signspeak.composer import TextComposer
-from signspeak.features import LEGACY_DIM, RICH_DIM, extract
+from signspeak.config import Settings, load_settings, save_settings
+from signspeak.features import DUAL_DIM, LEGACY_DIM, RICH_DIM, dual_hand_features, extract
 from signspeak.labels import BACKSPACE, PERIOD, SPACE, custom_word_label
 from signspeak.recognition import (
     ModelInfo,
@@ -32,6 +33,11 @@ class FeatureTests(unittest.TestCase):
         shifted = self.points + np.array([8, -3, 2], dtype=np.float32)
         self.assertEqual(legacy.shape, (LEGACY_DIM,))
         self.assertEqual(rich.shape, (RICH_DIM,))
+        other_hand = self.points.copy()
+        other_hand[:, 0] *= -1
+        dual = dual_hand_features([self.points, other_hand])
+        self.assertEqual(dual.shape, (DUAL_DIM,))
+        self.assertFalse(np.array_equal(dual[:RICH_DIM], dual[RICH_DIM:]))
         np.testing.assert_allclose(legacy, extract(shifted, "legacy42"), atol=1e-6)
         np.testing.assert_allclose(rich, extract(shifted, "rich63"), atol=1e-5)
 
@@ -61,6 +67,27 @@ class ComposerTests(unittest.TestCase):
         self.assertEqual(composer.word, "")
         self.assertTrue(composer.commit(BACKSPACE).changed)
         self.assertEqual(composer.transcript, "")
+
+    def test_delete_word_removes_current_or_last_completed_word(self):
+        composer = TextComposer()
+        composer.commit("H")
+        composer.commit("I")
+        composer.space()
+        composer.commit("Y")
+        composer.commit("O")
+        composer.commit("U")
+        composer.period()
+
+        self.assertTrue(composer.delete_word())
+        self.assertEqual(composer.transcript, "HI")
+        self.assertTrue(composer.delete_word())
+        self.assertEqual(composer.transcript, "")
+        self.assertFalse(composer.delete_word())
+
+        composer.commit("O")
+        composer.commit("K")
+        self.assertTrue(composer.delete_word())
+        self.assertEqual(composer.word, "")
 
 
 class RecognitionTests(unittest.TestCase):
@@ -129,7 +156,8 @@ class DatasetTests(unittest.TestCase):
             loaded = DatasetStore(Path(directory) / "samples.npz")
             self.assertEqual(loaded.counts(), {"A": 4})
             self.assertEqual(loaded.take_counts(), {"A": 2})
-            np.testing.assert_array_equal(loaded.data()[0], np.vstack([samples, samples[:1]]))
+            expected = np.pad(np.vstack([samples, samples[:1]]), ((0, 0), (0, RICH_DIM)))
+            np.testing.assert_array_equal(loaded.data()[0], expected)
             loaded.clear_label("A")
             self.assertEqual(loaded.total(), 0)
 
@@ -157,7 +185,7 @@ class DatasetTests(unittest.TestCase):
             model_path = Path(directory) / "user_model.joblib"
             result = train_model(X, y, model_path=model_path, groups=groups)
             classifier = load_user_classifier(model_path)
-            prediction = classifier.predict(X[0])
+            prediction = classifier.predict(np.pad(X[0], (0, RICH_DIM)))
             self.assertEqual(result.classes, 2)
             self.assertGreaterEqual(result.accuracy, 0.9)
             self.assertGreaterEqual(result.balanced_accuracy, 0.9)
@@ -165,6 +193,29 @@ class DatasetTests(unittest.TestCase):
             self.assertTrue(model_path.exists())
             self.assertIsNotNone(prediction)
             self.assertEqual(prediction.label, "A")
+
+    def test_old_single_hand_dataset_is_migrated_without_losing_samples(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "old_samples.npz"
+            old_samples = np.ones((4, RICH_DIM), dtype=np.float32)
+            np.savez_compressed(path, X=old_samples, y=np.array(["A"] * 4))
+            store = DatasetStore(path)
+            upgraded, labels, _groups = store.training_data()
+            self.assertEqual(upgraded.shape, (4, DUAL_DIM))
+            np.testing.assert_array_equal(upgraded[:, :RICH_DIM], old_samples)
+            np.testing.assert_array_equal(upgraded[:, RICH_DIM:], 0)
+            self.assertEqual(labels.tolist(), ["A"] * 4)
+
+
+class SettingsTests(unittest.TestCase):
+    def test_settings_camera_source_persistence(self):
+        settings = Settings(camera_source="rtsp://admin:admin123@192.168.128.10:554/h264/ch1/sub/av_stream")
+        self.assertIn("rtsp://", settings.camera_source)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            save_settings(settings, path)
+            loaded = load_settings(path)
+            self.assertEqual(loaded.camera_source, settings.camera_source)
 
 
 if __name__ == "__main__":

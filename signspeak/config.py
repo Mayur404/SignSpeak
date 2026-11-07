@@ -17,6 +17,8 @@ def _clamp(value: float, low: float, high: float) -> float:
 class Settings:
     # Camera
     camera_index: int = 0
+    camera_source: str = "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=1.sdp"
+    camera_source: str = ""
     mirror: bool = True
     inference_width: int = 640
     # Recognition
@@ -41,6 +43,7 @@ class Settings:
 
     def sanitized(self) -> "Settings":
         self.camera_index = int(_clamp(self.camera_index, 0, 15))
+        self.camera_source = str(getattr(self, "camera_source", "") or "").strip()
         self.inference_width = int(_clamp(self.inference_width, 320, 1280))
         self.confidence = float(_clamp(self.confidence, 0.20, 0.95))
         self.hold_ms = int(_clamp(self.hold_ms, 150, 2500))

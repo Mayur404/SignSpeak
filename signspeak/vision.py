@@ -9,13 +9,17 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+# Configure FFmpeg before cv2 loads its video backends. The stream reader
+# discards stale decoded frames, so TCP can remain reliable without a backlog.
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+
 import cv2
 import numpy as np
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QImage
 
 from .config import Settings
-from .features import as_points, rich_features
+from .features import as_points, dual_hand_features
 from .labels import display_name
 from .paths import LANDMARKER_MODEL
 from .recognition import RecognitionEngine, RecognitionState
@@ -30,6 +34,56 @@ HAND_CONNECTIONS = (
     (13, 17), (17, 18), (18, 19), (19, 20),
     (0, 17),
 )
+
+
+class _LatestFrameReader:
+    """Keep RTSP decoding ahead of inference and expose only the newest frame."""
+
+    def __init__(self, capture):
+        self.capture = capture
+        self._lock = threading.Lock()
+        self._frame = None
+        self._sequence = 0
+        self._failed = False
+        self._stopped = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="camera-reader", daemon=True)
+        self._thread.start()
+
+    def _run(self):
+        while not self._stopped.is_set():
+            try:
+                ok, frame = self.capture.read()
+            except Exception:
+                # OpenCV can throw when release() interrupts a blocking RTSP
+                # read during shutdown. Treat it as an ordinary end of feed.
+                if not self._stopped.is_set():
+                    self._failed = True
+                return
+            if not ok or frame is None:
+                time.sleep(0.005)
+                continue
+            with self._lock:
+                self._frame = frame
+                self._sequence += 1
+
+    def read(self):
+        with self._lock:
+            if self._sequence == 0 or self._failed:
+                return False, None
+            self._sequence = 0
+            return True, self._frame
+
+    def close(self):
+        self._stopped.set()
+        try:
+            self.capture.release()
+        except Exception:
+            pass
+        self._thread.join(timeout=1.0)
+
+    def release(self):
+        """Match VideoCapture's cleanup method for shared worker error paths."""
+        self.close()
 
 ACCENT = (238, 211, 34)      # #22D3EE in BGR
 VIOLET = (246, 92, 139)      # #8B5CF6 in BGR
@@ -94,13 +148,16 @@ def _rounded_rect(image, p1, p2, color, radius=12, thickness=-1, alpha=1.0):
 
 def _draw_overlay(frame, points, state: RecognitionState, mirror: bool, paused: bool = False):
     h, w = frame.shape[:2]
+    hands = np.asarray(points)
+    if hands.ndim == 2:
+        hands = hands[None, ...]
 
     def px(x, y):
         x = 1.0 - x if mirror else x
         return int(x * w), int(y * h)
 
-    xs = [1.0 - p[0] if mirror else p[0] for p in points]
-    ys = [p[1] for p in points]
+    xs = [1.0 - p[0] if mirror else p[0] for hand in hands for p in hand]
+    ys = [p[1] for hand in hands for p in hand]
     pad = 0.025
     x1 = int(max(0.0, min(xs) - pad) * w)
     x2 = int(min(1.0, max(xs) + pad) * w)
@@ -108,17 +165,24 @@ def _draw_overlay(frame, points, state: RecognitionState, mirror: bool, paused: 
     y2 = int(min(1.0, max(ys) + pad) * h)
     color = GREEN if state.stable_label else ACCENT
 
-    # Skeleton with a soft dark outline for contrast.
-    for a, b in HAND_CONNECTIONS:
-        pa, pb = px(points[a][0], points[a][1]), px(points[b][0], points[b][1])
-        cv2.line(frame, pa, pb, DARK, 7, cv2.LINE_AA)
-        cv2.line(frame, pa, pb, color, 3, cv2.LINE_AA)
+    # Draw each detected hand in its own accent so both skeletons are clear.
+    hand_colors = (color, VIOLET)
+    for hand_index, hand in enumerate(hands):
+        hand_color = hand_colors[hand_index % len(hand_colors)]
+        for a, b in HAND_CONNECTIONS:
+            pa, pb = px(hand[a][0], hand[a][1]), px(hand[b][0], hand[b][1])
+            cv2.line(frame, pa, pb, DARK, 7, cv2.LINE_AA)
+            cv2.line(frame, pa, pb, hand_color, 3, cv2.LINE_AA)
 
-    for index, point in enumerate(points):
-        center = px(point[0], point[1])
-        radius = 6 if index in (4, 8, 12, 16, 20) else 4
-        cv2.circle(frame, center, radius + 2, DARK, -1, cv2.LINE_AA)
-        cv2.circle(frame, center, radius, WHITE if index in (4, 8, 12, 16, 20) else color, -1, cv2.LINE_AA)
+        for index, point in enumerate(hand):
+            center = px(point[0], point[1])
+            radius = 6 if index in (4, 8, 12, 16, 20) else 4
+            cv2.circle(frame, center, radius + 2, DARK, -1, cv2.LINE_AA)
+            cv2.circle(
+                frame, center, radius,
+                WHITE if index in (4, 8, 12, 16, 20) else hand_color,
+                -1, cv2.LINE_AA,
+            )
 
     # Modern corner brackets instead of a heavy rectangle.
     length = max(18, int(min(x2 - x1, y2 - y1) * 0.18))
@@ -170,7 +234,7 @@ class HandTracker:
         options = vision.HandLandmarkerOptions(
             base_options=mp_python.BaseOptions(model_asset_path=str(LANDMARKER_MODEL)),
             running_mode=vision.RunningMode.VIDEO,
-            num_hands=1,
+            num_hands=2,
             min_hand_detection_confidence=detection,
             min_hand_presence_confidence=detection,
             min_tracking_confidence=tracking,
@@ -199,14 +263,12 @@ class HandTracker:
                 result = self._detector.detect_for_video(image, timestamp_ms)
             if not result.hand_landmarks:
                 return None
-            landmarks = result.hand_landmarks[0]
-            handedness = ""
-            score = 0.0
-            if result.handedness:
-                category = result.handedness[0][0]
-                handedness = category.category_name or ""
-                score = float(category.score or 0.0)
-            return Observation(as_points(landmarks), handedness, score)
+            hands = np.stack([as_points(hand) for hand in result.hand_landmarks])
+            categories = [row[0] for row in result.handedness if row] if result.handedness else []
+            handedness = "+".join(category.category_name or "" for category in categories)
+            scores = [float(category.score or 0.0) for category in categories]
+            score = float(np.mean(scores)) if scores else 0.0
+            return Observation(hands, handedness, score)
 
     def close(self) -> None:
         with self._lock:
@@ -298,9 +360,9 @@ class CameraWorker(QThread):
         self._manual_commit = False
 
     # ---- thread-safe control surface -------------------------------------
-    def stop(self) -> None:
+    def stop(self, timeout_ms: int = 8000) -> bool:
         self._stop.set()
-        self.wait(2500)
+        return self.wait(timeout_ms)
 
     def request_manual_commit(self) -> None:
         self._manual_commit = True
@@ -339,7 +401,7 @@ class CameraWorker(QThread):
             self._rec_label = None
             self._rec_samples = []
         if label:
-            array = np.asarray(samples, dtype=np.float32) if samples else np.empty((0, 63), np.float32)
+            array = np.asarray(samples, dtype=np.float32) if samples else np.empty((0, 126), np.float32)
             self.recordingFinished.emit(label, array)
 
     # ---- main loop -------------------------------------------------------
@@ -358,6 +420,7 @@ class CameraWorker(QThread):
         self.statusChanged.emit("live")
         start = time.monotonic()
         last_frame = start
+        last_preview = 0.0
         fps = 0.0
         failures = 0
         try:
@@ -365,7 +428,9 @@ class CameraWorker(QThread):
                 ok, frame = cap.read()
                 if not ok or frame is None:
                     failures += 1
-                    if failures > 60:
+                    # RTSP may take several seconds to deliver the first frame,
+                    # especially while opening the 4K main stream.
+                    if failures > 300:
                         self.error.emit("Lost the camera feed. Reconnect it and press Retry.")
                         break
                     time.sleep(0.03)
@@ -413,7 +478,21 @@ class CameraWorker(QThread):
                     _draw_paused(display)
 
                 self.stateReady.emit(state)
-                self.frameReady.emit(self._to_qimage(display))
+                # Limit Qt preview updates so a high resolution stream cannot
+                # queue old images behind the camera's live feed.
+                if now - last_preview >= 1.0 / 15.0:
+                    last_preview = now
+                    display_width = 1280
+                    if display.shape[1] > display_width:
+                        display = cv2.resize(
+                            display,
+                            (
+                                display_width,
+                                int(display.shape[0] * display_width / display.shape[1]),
+                            ),
+                            interpolation=cv2.INTER_AREA,
+                        )
+                    self.frameReady.emit(self._to_qimage(display))
 
                 elapsed = now - last_frame
                 last_frame = now
@@ -425,7 +504,10 @@ class CameraWorker(QThread):
         finally:
             self._finish_recording()
             try:
-                cap.release()
+                if isinstance(cap, _LatestFrameReader):
+                    cap.close()
+                else:
+                    cap.release()
             except Exception:
                 pass
             self.statusChanged.emit("stopped")
@@ -440,7 +522,7 @@ class CameraWorker(QThread):
             if now >= self._rec_until or len(self._rec_samples) >= MAX_SAMPLES_PER_TAKE:
                 finished = True
             elif points is not None and now - self._rec_last >= 0.18:
-                self._rec_samples.append(rich_features(points))
+                self._rec_samples.append(dual_hand_features(points))
                 self._rec_last = now
                 progress = len(self._rec_samples)
         if progress is not None:
@@ -449,6 +531,62 @@ class CameraWorker(QThread):
             self._finish_recording()
 
     def _open_camera(self):
+        source = (getattr(self.settings, "camera_source", "") or "").strip()
+        if source:
+            # Handle RTSP / IP camera stream
+            import os
+            # Set this before opening each RTSP capture. Avoid FFmpeg's
+            # no-buffer/low-delay decoder flags, which can reject fragmented
+            # H.264 packets from this camera.
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+
+            candidates = [source]
+            if "192.168.128.10" in source or "stream1" in source or "stream0" in source:
+                sp_sub = "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=1.sdp"
+                sp_main = "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=0.sdp"
+                # Honor the stream selected in the UI, then use the other
+                # Sparsh stream only if the selected one cannot be opened.
+                if "/stream=1." in source:
+                    alternate = sp_main
+                elif "/stream=0." in source:
+                    alternate = sp_sub
+                else:
+                    alternate = sp_sub
+                candidates = [source]
+                if alternate not in candidates:
+                    candidates.append(alternate)
+
+            cap = None
+            for url in candidates:
+                try:
+                    params = [
+                        cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000,
+                        cv2.CAP_PROP_READ_TIMEOUT_MSEC, 2000,
+                    ]
+                    try:
+                        cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG, params)
+                    except (TypeError, cv2.error):
+                        cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+                    if cap.isOpened():
+                        break
+                    cap.release()
+                    cap = None
+                except Exception:
+                    if cap is not None:
+                        cap.release()
+                    cap = None
+
+            if cap is None or not cap.isOpened():
+                self.error.emit(
+                    f"Could not connect to camera stream:\n{source}\n\n"
+                    "Please check the Ethernet link to 192.168.128.10."
+                )
+                if cap is not None:
+                    cap.release()
+                return None
+
+            return _LatestFrameReader(cap)
+
         index = int(self.settings.camera_index)
         cap = None
         if sys.platform == "win32":
@@ -485,33 +623,51 @@ class CameraWorker(QThread):
 
 
 class CameraProbe(QThread):
-    """Enumerate working camera indices without blocking the UI.
-
-    The camera that is already in use is skipped so probing cannot fight the
-    capture thread for the same device.
-    """
+    """Enumerate working cameras and RTSP streams without blocking the UI."""
 
     finishedList = Signal(list)
 
-    def __init__(self, skip_index: int | None = None, parent=None):
+    def __init__(self, skip_source: int | str | None = None, parent=None):
         super().__init__(parent)
-        self.skip_index = skip_index
+        self.skip_source = skip_source
 
     def run(self) -> None:
-        found: list[tuple[int, str]] = []
+        import socket
+
+        found: list[tuple[int | str, str]] = []
+
+        # Check if Sparsh CCTV camera is reachable on Ethernet link
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(0.4)
+            if sock.connect_ex(("192.168.128.10", 554)) == 0:
+                found.append((
+                    "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=1.sdp",
+                    "Sparsh CCTV (720p Substream - Fast)",
+                ))
+                found.append((
+                    "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=0.sdp",
+                    "Sparsh CCTV (4K Mainstream - higher latency)",
+                ))
+            sock.close()
+        except Exception:
+            pass
+
+        # If current source is a custom RTSP stream, retain it in list
+        if isinstance(self.skip_source, str) and self.skip_source.startswith("rtsp://"):
+            existing = [item[0] for item in found]
+            if self.skip_source not in existing:
+                found.append((self.skip_source, "Custom RTSP Stream"))
+
         for index in range(5):
-            if self.skip_index is not None and index == int(self.skip_index):
+            if self.skip_source == index:
                 continue
             cap = None
             try:
-                if sys.platform == "win32":
-                    cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-                if cap is None or not cap.isOpened():
-                    if cap is not None:
-                        cap.release()
-                    cap = cv2.VideoCapture(index)
+                backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY
+                cap = cv2.VideoCapture(index, backend)
                 if cap.isOpened():
-                    found.append((index, f"Camera {index}"))
+                    found.append((index, f"Webcam {index}"))
             except Exception:
                 pass
             finally:

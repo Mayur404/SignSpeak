@@ -40,10 +40,11 @@ class TranslatePage(QWidget):
     backspace = Signal()
     space = Signal()
     clear_word = Signal()
+    delete_word = Signal()
     clear_all = Signal()
     pause_toggled = Signal(bool)
     mirror_toggled = Signal(bool)
-    camera_changed = Signal(int)
+    camera_changed = Signal(object)
     retry_camera = Signal()
     auto_word_changed = Signal(bool)
     auto_sentence_changed = Signal(bool)
@@ -112,7 +113,7 @@ class TranslatePage(QWidget):
         self.pause_button.toggled.connect(self._on_pause)
         controls_row.addWidget(self.pause_button)
         self.camera_combo = QComboBox()
-        self.camera_combo.setMinimumWidth(118)
+        self.camera_combo.setMinimumWidth(210)
         self.camera_combo.addItem("Camera 0", 0)
         self.camera_combo.currentIndexChanged.connect(self._on_camera)
         controls_row.addWidget(self.camera_combo)
@@ -226,10 +227,17 @@ class TranslatePage(QWidget):
         transcript_header = QHBoxLayout()
         transcript_header.addWidget(self._section("Transcript"))
         transcript_header.addStretch(1)
+        self.delete_word_button = QPushButton("Delete word")
+        self.delete_word_button.setObjectName("Ghost")
+        self.delete_word_button.setToolTip(
+            "Remove the current word, or the last completed word"
+        )
+        self.delete_word_button.clicked.connect(self.delete_word)
         self.copy_button = IconButton("copy", "Copy transcript", 32)
         self.copy_button.clicked.connect(self._copy)
         self.clear_all_button = IconButton("trash", "Clear transcript (Ctrl+R)", 32)
         self.clear_all_button.clicked.connect(self.clear_all)
+        transcript_header.addWidget(self.delete_word_button)
         transcript_header.addWidget(self.copy_button)
         transcript_header.addWidget(self.clear_all_button)
         transcript_card.body.addLayout(transcript_header)
@@ -267,7 +275,7 @@ class TranslatePage(QWidget):
         shortcut_icon.setPixmap(make_icon("keyboard", theme.FAINT, 14).pixmap(14, 14))
         shortcut_row.addWidget(shortcut_icon)
         shortcuts = QLabel(
-            "Enter · type sign      Backspace · undo      Esc · pause      Ctrl+R · reset"
+            "Enter · type sign      Backspace · undo      Ctrl+Backspace · delete word      Esc · pause      Ctrl+R · reset"
         )
         shortcuts.setObjectName("Muted")
         shortcut_row.addWidget(shortcuts)
@@ -417,11 +425,11 @@ class TranslatePage(QWidget):
         self.mirror_button.setChecked(mirror)
         self.mirror_button.blockSignals(False)
 
-    def set_cameras(self, cameras: list[tuple[int, str]], current: int) -> None:
+    def set_cameras(self, cameras: list[tuple[int | str, str]], current: int | str) -> None:
         self.camera_combo.blockSignals(True)
         self.camera_combo.clear()
-        for index, name in cameras:
-            self.camera_combo.addItem(name, index)
+        for key, name in cameras:
+            self.camera_combo.addItem(name, key)
         if not cameras:
             self.camera_combo.addItem(f"Camera {current}", current)
         position = self.camera_combo.findData(current)
@@ -450,7 +458,7 @@ class TranslatePage(QWidget):
     def _on_camera(self, index: int) -> None:
         data = self.camera_combo.itemData(index)
         if data is not None:
-            self.camera_changed.emit(int(data))
+            self.camera_changed.emit(data)
 
     def _copy(self) -> None:
         text = self.transcript.toPlainText().strip()

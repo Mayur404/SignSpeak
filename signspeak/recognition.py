@@ -92,6 +92,10 @@ class SignClassifier:
 
     def predict(self, features: np.ndarray) -> Prediction | None:
         vector = np.asarray(features, dtype=np.float32).reshape(1, -1)
+        # Existing personal models and training examples contain one 63-value
+        # hand. Place that hand in slot one when used with a new dual-hand model.
+        if self.feature_mode == "rich126" and vector.shape[1] == 63:
+            vector = np.pad(vector, ((0, 0), (0, 63)))
         if vector.shape[1] != self.feature_dim:
             return None
         try:

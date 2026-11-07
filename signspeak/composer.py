@@ -119,6 +119,21 @@ class TextComposer:
             return True
         return False
 
+    def delete_word(self) -> bool:
+        """Remove the unfinished word, or the last completed transcript word."""
+        if self.word:
+            self.word = ""
+            return True
+        if not self.tokens:
+            return False
+        if self.tokens[-1] == PERIOD:
+            self.tokens.pop()
+        for index in range(len(self.tokens) - 1, -1, -1):
+            if self.tokens[index] != PERIOD:
+                del self.tokens[index]
+                return True
+        return False
+
     def clear_word(self) -> bool:
         changed = bool(self.word)
         self.word = ""

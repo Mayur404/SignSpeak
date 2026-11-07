@@ -240,6 +240,7 @@ class ToggleSwitch(QAbstractButton):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor("#FFFFFF" if self.isChecked() else "#93A6BF"))
         painter.drawEllipse(QPointF(knob_x, self.height() / 2), 9, 9)
+        painter.end()
 
 
 class ToggleRow(QWidget):
@@ -406,22 +407,19 @@ class VideoView(QWidget):
             image = self._image
             scaled = image.scaled(
                 rect.size().toSize(),
-                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
-            sx = max(0, (scaled.width() - int(rect.width())) // 2)
-            sy = max(0, (scaled.height() - int(rect.height())) // 2)
-            painter.drawImage(
-                rect,
-                scaled,
-                QRectF(sx, sy, rect.width(), rect.height()),
-            )
+            x = rect.x() + (rect.width() - scaled.width()) / 2
+            y = rect.y() + (rect.height() - scaled.height()) / 2
+            painter.drawImage(QRectF(x, y, scaled.width(), scaled.height()), scaled)
         else:
             if not self._show_placeholder:
                 painter.setClipping(False)
                 painter.setBrush(Qt.BrushStyle.NoBrush)
                 painter.setPen(QPen(QColor(theme.BORDER), 1))
                 painter.drawRoundedRect(rect, 17, 17)
+                painter.end()
                 return
             pixmap = icon_pixmap(self._icon, theme.FAINT, 42)
             painter.drawPixmap(
@@ -446,6 +444,7 @@ class VideoView(QWidget):
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(QPen(QColor(theme.BORDER), 1))
         painter.drawRoundedRect(rect, 17, 17)
+        painter.end()
 
 
 class RoundedImage(QWidget):
@@ -483,6 +482,7 @@ class RoundedImage(QWidget):
         painter.setPen(QPen(QColor(theme.BORDER), 1))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(rect, 14, 14)
+        painter.end()
 
 
 class SignDial(QWidget):
@@ -598,6 +598,7 @@ class SignDial(QWidget):
             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
             caption,
         )
+        painter.end()
 
 
 class ConfidenceBar(QWidget):
@@ -631,6 +632,7 @@ class ConfidenceBar(QWidget):
             x = rect.left() + rect.width() * self._threshold
             painter.setPen(QPen(QColor(255, 255, 255, 70), 1))
             painter.drawLine(QPointF(x, rect.top() - 2), QPointF(x, rect.bottom() + 2))
+        painter.end()
 
 
 class LetterTile(QAbstractButton):
@@ -713,6 +715,7 @@ class LetterTile(QAbstractButton):
             painter.setBrush(QColor(theme.GREEN))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(QPointF(rect.right() - 7, rect.top() + 7), 3, 3)
+        painter.end()
 
 
 class LogoMark(QWidget):
@@ -731,6 +734,7 @@ class LogoMark(QWidget):
         painter.drawPixmap(
             int(rect.center().x() - 12), int(rect.center().y() - 12), pixmap
         )
+        painter.end()
 
 
 class Toast(QLabel):

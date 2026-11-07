@@ -134,7 +134,7 @@ class TrainPage(QWidget):
         self.preview.setMinimumSize(380, 200)
         preview_card.body.addWidget(self.preview, 1)
         preview_hint = QLabel(
-            "Keep your whole hand visible. Use even light, and vary hand position slightly between takes."
+            "Keep both hands visible for two-hand signs. Use even light, and vary hand position slightly between takes."
         )
         preview_hint.setObjectName("Muted")
         preview_hint.setWordWrap(True)

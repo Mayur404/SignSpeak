@@ -9,7 +9,7 @@ from typing import Callable
 
 import numpy as np
 
-from .features import RICH_DIM
+from .features import DUAL_DIM, RICH_DIM
 from .labels import is_trainable_label
 from .paths import USER_DATASET, USER_MODEL
 
@@ -42,7 +42,7 @@ class DatasetStore:
     def __init__(self, path: Path = USER_DATASET):
         self.path = path
         self._lock = threading.Lock()
-        self._X: np.ndarray = np.empty((0, RICH_DIM), dtype=np.float32)
+        self._X: np.ndarray = np.empty((0, DUAL_DIM), dtype=np.float32)
         self._y: np.ndarray = np.empty((0,), dtype=LABEL_DTYPE)
         self._groups: np.ndarray = np.empty((0,), dtype=np.int64)
         self.load()
@@ -66,11 +66,14 @@ class DatasetStore:
                         ) - 1
                     else:
                         groups = np.empty((0,), dtype=np.int64)
-                if X.ndim == 2 and X.shape[1] == RICH_DIM and len(X) == len(y):
+                if X.ndim == 2 and X.shape[1] == RICH_DIM:
+                    # Preserve existing single-hand recordings in the first slot.
+                    X = np.pad(X, ((0, 0), (0, RICH_DIM)))
+                if X.ndim == 2 and X.shape[1] == DUAL_DIM and len(X) == len(y):
                     if len(groups) == len(y):
                         self._X, self._y, self._groups = X, y, groups
             except (OSError, ValueError, KeyError):
-                self._X = np.empty((0, RICH_DIM), dtype=np.float32)
+                self._X = np.empty((0, DUAL_DIM), dtype=np.float32)
                 self._y = np.empty((0,), dtype=LABEL_DTYPE)
                 self._groups = np.empty((0,), dtype=np.int64)
 
@@ -84,8 +87,10 @@ class DatasetStore:
 
     def add_samples(self, label: str, samples: np.ndarray) -> int:
         samples = np.asarray(samples, dtype=np.float32)
-        if samples.ndim != 2 or samples.shape[1] != RICH_DIM or len(samples) == 0:
+        if samples.ndim != 2 or samples.shape[1] not in (RICH_DIM, DUAL_DIM) or len(samples) == 0:
             return 0
+        if samples.shape[1] == RICH_DIM:
+            samples = np.pad(samples, ((0, 0), (0, RICH_DIM)))
         with self._lock:
             self._X = np.vstack([self._X, samples])
             self._y = np.concatenate(
@@ -132,7 +137,7 @@ class DatasetStore:
 
     def clear(self) -> None:
         with self._lock:
-            self._X = np.empty((0, RICH_DIM), dtype=np.float32)
+            self._X = np.empty((0, DUAL_DIM), dtype=np.float32)
             self._y = np.empty((0,), dtype=LABEL_DTYPE)
             self._groups = np.empty((0,), dtype=np.int64)
         self.save()
@@ -170,7 +175,9 @@ def _build_candidates():
                 n_estimators=300,
                 min_samples_leaf=1,
                 class_weight="balanced",
-                n_jobs=-1,
+                # Avoid competing with the live camera/tracker for every CPU
+                # core while personal training runs in the background.
+                n_jobs=1,
                 random_state=42,
             ),
         ),
@@ -193,7 +200,7 @@ def _build_candidates():
             RandomForestClassifier(
                 n_estimators=300,
                 class_weight="balanced_subsample",
-                n_jobs=-1,
+                n_jobs=1,
                 random_state=42,
             ),
         ),
@@ -215,8 +222,10 @@ def train_model(
 
     X = np.asarray(X, dtype=np.float32)
     y = np.asarray(y)
-    if X.ndim != 2 or X.shape[1] != RICH_DIM:
+    if X.ndim != 2 or X.shape[1] not in (RICH_DIM, DUAL_DIM):
         raise TrainingError("Dataset has an unexpected feature shape.")
+    if X.shape[1] == RICH_DIM:
+        X = np.pad(X, ((0, 0), (0, RICH_DIM)))
     if len(X) != len(y) or len(X) == 0:
         raise TrainingError("No samples available to train on.")
     if groups is not None:
@@ -325,7 +334,7 @@ def train_model(
     bundle = {
         "model": best_model,
         "labels": [str(label) for label in labels],
-        "feature_mode": "rich63",
+        "feature_mode": "rich126",
         "algorithm": best_name,
         "accuracy": best_accuracy,
         "balanced_accuracy": best_balanced,

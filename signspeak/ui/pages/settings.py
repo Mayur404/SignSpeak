@@ -73,13 +73,13 @@ class SettingsPage(QWidget):
 
         # ---- camera -------------------------------------------------------
         camera_card, camera_body = self._card(
-            "Camera", "Pick the webcam SignSpeak should use."
+            "Camera", "Pick the webcam or CCTV stream SignSpeak should use."
         )
         camera_row = QHBoxLayout()
         camera_caption = QLabel("Device")
         camera_caption.setObjectName("Value")
         self.camera_combo = QComboBox()
-        self.camera_combo.setMinimumWidth(170)
+        self.camera_combo.setMinimumWidth(240)
         self.camera_combo.addItem("Camera 0", 0)
         self.camera_combo.currentIndexChanged.connect(self._camera_changed)
         camera_row.addWidget(camera_caption)
@@ -149,7 +149,7 @@ class SettingsPage(QWidget):
 
         # ---- speech -------------------------------------------------------
         speech_card, speech_body = self._card(
-            "Speech", "SignSpeak speaks fully offline using your system voices."
+            "Speech", "Choose an installed voice. Windows Natural voices, including Indian English, work offline after download."
         )
         voice_row = QHBoxLayout()
         voice_caption = QLabel("Voice")
@@ -314,7 +314,7 @@ class SettingsPage(QWidget):
     def _camera_changed(self, index: int) -> None:
         data = self.camera_combo.itemData(index)
         if data is not None:
-            self._emit("camera_index", int(data))
+            self._emit("camera_source", data)
 
     def _width_changed(self, index: int) -> None:
         data = self.width_combo.itemData(index)
@@ -334,7 +334,8 @@ class SettingsPage(QWidget):
     def set_values(self, settings: Settings) -> None:
         self._syncing = True
         try:
-            position = self.camera_combo.findData(settings.camera_index)
+            current = settings.camera_source if settings.camera_source else settings.camera_index
+            position = self.camera_combo.findData(current)
             if position >= 0:
                 self.camera_combo.setCurrentIndex(position)
             position = self.width_combo.findData(settings.inference_width)
@@ -359,12 +360,12 @@ class SettingsPage(QWidget):
         finally:
             self._syncing = False
 
-    def set_cameras(self, cameras: list[tuple[int, str]], current: int) -> None:
+    def set_cameras(self, cameras: list[tuple[int | str, str]], current: int | str) -> None:
         self._syncing = True
         try:
             self.camera_combo.clear()
-            for index, name in cameras:
-                self.camera_combo.addItem(name, index)
+            for key, name in cameras:
+                self.camera_combo.addItem(name, key)
             if not cameras:
                 self.camera_combo.addItem(f"Camera {current}", current)
             position = self.camera_combo.findData(current)

@@ -17,8 +17,9 @@ import numpy as np
 NUM_LANDMARKS = 21
 LEGACY_DIM = NUM_LANDMARKS * 2
 RICH_DIM = NUM_LANDMARKS * 3
+DUAL_DIM = RICH_DIM * 2
 
-FEATURE_DIMS = {"legacy42": LEGACY_DIM, "rich63": RICH_DIM}
+FEATURE_DIMS = {"legacy42": LEGACY_DIM, "rich63": RICH_DIM, "rich126": DUAL_DIM}
 
 
 def as_points(landmarks) -> np.ndarray:
@@ -75,9 +76,35 @@ def rich_features(points: np.ndarray) -> np.ndarray:
     return np.clip(points.reshape(-1), -4.0, 4.0).astype(np.float32)
 
 
+def dual_hand_features(hands) -> np.ndarray:
+    """Normalize up to two hands and concatenate their 63-value features.
+
+    Hands are ordered by horizontal position in the camera image. Missing
+    hands occupy an all-zero slot, allowing one- and two-hand signs to share
+    one fixed-size feature vector.
+    """
+    normalized = [as_points(hand) for hand in hands]
+    if len(normalized) > 2:
+        normalized = normalized[:2]
+    normalized.sort(key=lambda hand: float(hand[:, 0].mean()))
+    vectors = [rich_features(hand) for hand in normalized]
+    while len(vectors) < 2:
+        vectors.append(np.zeros(RICH_DIM, dtype=np.float32))
+    return np.concatenate(vectors).astype(np.float32)
+
+
 def extract(points: np.ndarray, mode: str) -> np.ndarray:
     if mode == "legacy42":
+        if isinstance(points, np.ndarray) and points.ndim == 3:
+            points = points[0]
         return legacy_features(points)
     if mode == "rich63":
+        # Keep older personal models working after multi-hand tracking is enabled.
+        if isinstance(points, np.ndarray) and points.ndim == 3:
+            points = points[0]
         return rich_features(points)
+    if mode == "rich126":
+        if isinstance(points, np.ndarray) and points.ndim == 2:
+            points = [points]
+        return dual_hand_features(points)
     raise ValueError(f"Unknown feature mode: {mode}")
