@@ -69,10 +69,14 @@ class TrainingThread(QThread):
 
 
 class TrainPage(QWidget):
-    record_requested = Signal(str, float)
+    record_requested = Signal(str, float, float)
+    capture_delay_changed = Signal(float)
     cancel_recording = Signal()
     train_requested = Signal()
     activate_model = Signal(str)
+    save_model = Signal()
+    load_model = Signal()
+    remove_word_requested = Signal(str)
     clear_label = Signal(str)
     clear_dataset = Signal()
     toast_requested = Signal(str, str)
@@ -94,14 +98,14 @@ class TrainPage(QWidget):
         root.setSpacing(16)
 
         self.header = PageHeader(
-            "Teach SignSpeak",
-            "Record each sign in separate takes. Keep the handshape, and vary hand position and distance between takes.",
+            "Train your model",
+            "Build a recognizer around your hands. Record separate takes with small changes in position and distance.",
         )
         self.model_pill = Pill("BUNDLED MODEL", "violet")
         self.header.add_action(self.model_pill)
         self.header_train_button = QPushButton("Train model")
         self.header_train_button.setObjectName("Primary")
-        self.header_train_button.setIcon(make_icon("wand", "#06111D", 15))
+        self.header_train_button.setIcon(make_icon("wand", "#FFFFFF", 15))
         self.header_train_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.header_train_button.clicked.connect(self._request_training)
         self.header.add_action(self.header_train_button)
@@ -167,24 +171,44 @@ class TrainPage(QWidget):
         self.selected_hint.setMinimumHeight(38)
         record_card.body.addWidget(self.selected_hint)
         duration_row = QHBoxLayout()
+        duration_row.setSpacing(10)
         duration_caption = QLabel("Capture length")
-        duration_caption.setObjectName("Muted")
+        duration_caption.setObjectName("Value")
         self.duration_combo = QComboBox()
-        self.duration_combo.addItem("2 seconds", 2.0)
-        self.duration_combo.addItem("3 seconds", 3.0)
-        self.duration_combo.addItem("4 seconds", 4.0)
+        self.duration_combo.addItem("2 sec", 2.0)
+        self.duration_combo.addItem("3 sec", 3.0)
+        self.duration_combo.addItem("4 sec", 4.0)
         self.duration_combo.setCurrentIndex(1)
         duration_row.addWidget(duration_caption)
-        duration_row.addStretch(1)
         duration_row.addWidget(self.duration_combo)
+        delay_caption = QLabel("Start delay")
+        delay_caption.setObjectName("Value")
+        self.delay_combo = QComboBox()
+        for seconds in (0, 2, 3, 5, 8):
+            self.delay_combo.addItem("Off" if seconds == 0 else f"{seconds} sec", float(seconds))
+        self.delay_combo.setCurrentIndex(2)
+        self.delay_combo.currentIndexChanged.connect(self._capture_delay_changed)
+        delay_row = QHBoxLayout()
+        delay_row.setSpacing(6)
+        delay_row.addWidget(delay_caption)
+        delay_row.addWidget(self.delay_combo, 1)
+        duration_row.addStretch(1)
+        duration_row.addLayout(delay_row, 1)
         record_card.body.addWidget(row_widget(duration_row, 36))
         self.record_button = QPushButton("Record sign")
         self.record_button.setObjectName("Primary")
-        self.record_button.setIcon(make_icon("record", "#06111D", 16))
+        self.record_button.setIcon(make_icon("record", "#FFFFFF", 16))
         self.record_button.setMinimumHeight(40)
         self.record_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.record_button.clicked.connect(self._start_recording)
-        record_card.body.addWidget(self.record_button)
+        record_controls = QHBoxLayout()
+        record_controls.addWidget(self.record_button, 1)
+        self.cancel_record_button = QPushButton("Cancel")
+        self.cancel_record_button.setObjectName("Ghost")
+        self.cancel_record_button.clicked.connect(self.cancel_recording.emit)
+        self.cancel_record_button.hide()
+        record_controls.addWidget(self.cancel_record_button)
+        record_card.body.addLayout(record_controls)
         self.record_progress = QProgressBar()
         self.record_progress.setRange(0, 100)
         self.record_progress.setValue(0)
@@ -199,6 +223,17 @@ class TrainPage(QWidget):
         clear_selected.setIcon(make_icon("trash", theme.MUTED, 14))
         clear_selected.clicked.connect(lambda: self.clear_label.emit(self._selected))
         record_card.body.addWidget(clear_selected, 0, Qt.AlignmentFlag.AlignLeft)
+        self.remove_word_button = QPushButton("Remove custom word")
+        self.remove_word_button.setObjectName("Danger")
+        self.remove_word_button.setIcon(make_icon("trash", theme.RED, 14))
+        self.remove_word_button.setToolTip(
+            "Remove this custom label and all of its recorded examples from the dataset."
+        )
+        self.remove_word_button.clicked.connect(
+            lambda: self.remove_word_requested.emit(self._selected)
+        )
+        self.remove_word_button.hide()
+        record_card.body.addWidget(self.remove_word_button, 0, Qt.AlignmentFlag.AlignLeft)
         top_row.addWidget(record_card, 2)
 
         # ---- dataset ------------------------------------------------------
@@ -264,7 +299,7 @@ class TrainPage(QWidget):
         )
         self.train_button = QPushButton("Train personal model")
         self.train_button.setObjectName("Primary")
-        self.train_button.setIcon(make_icon("wand", "#06111D", 16))
+        self.train_button.setIcon(make_icon("wand", "#FFFFFF", 16))
         self.train_button.setMinimumHeight(40)
         self.train_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.train_button.clicked.connect(self._request_training)
@@ -303,15 +338,21 @@ class TrainPage(QWidget):
         self.use_personal = QPushButton("Use personal")
         self.use_personal.setObjectName("Primary")
         self.use_personal.clicked.connect(lambda: self.activate_model.emit("user"))
-        self.use_bundled = QPushButton("Use bundled")
-        self.use_bundled.setObjectName("Ghost")
-        self.use_bundled.clicked.connect(lambda: self.activate_model.emit("legacy"))
         button_row.addWidget(self.use_personal)
-        button_row.addWidget(self.use_bundled)
         model_card.body.addLayout(button_row)
+        snapshot_row = QHBoxLayout()
+        self.save_model_button = QPushButton("Save a copy…")
+        self.save_model_button.setObjectName("Ghost")
+        self.save_model_button.clicked.connect(self.save_model.emit)
+        self.load_model_button = QPushButton("Load saved model…")
+        self.load_model_button.setObjectName("Ghost")
+        self.load_model_button.clicked.connect(self.load_model.emit)
+        snapshot_row.addWidget(self.save_model_button)
+        snapshot_row.addWidget(self.load_model_button)
+        model_card.body.addLayout(snapshot_row)
         self.model_note = QLabel(
-            "Personal models are far more accurate for your own hand. "
-            "The bundled model is a starting point trained by the original author."
+            "Personal models adapt to the examples you record. Keep a saved copy "
+            "before retraining if you want to return to an earlier version."
         )
         self.model_note.setObjectName("Muted")
         self.model_note.setWordWrap(True)
@@ -387,6 +428,9 @@ class TrainPage(QWidget):
         else:
             hint = SIGN_HINTS.get(self._selected, "")
         self.selected_hint.setText(hint)
+        is_custom = is_custom_word_label(self._selected)
+        self.remove_word_button.setVisible(is_custom)
+        self.remove_word_button.setEnabled(is_custom and not self._training and not self._recording)
         self.selected_count.setText(
             f"{count} samples · {self._take_counts.get(self._selected, 0)} takes · "
             f"target {RECOMMENDED_SAMPLES}"
@@ -426,6 +470,21 @@ class TrainPage(QWidget):
             tile.set_count(self._counts.get(label, 0))
         self._refresh()
 
+    def remove_custom_word(self, label: str) -> None:
+        if not is_custom_word_label(label):
+            return
+        self._counts.pop(label, None)
+        self._take_counts.pop(label, None)
+        tile = self.tiles.pop(label, None)
+        if tile is not None:
+            self.group.removeButton(tile)
+            self.grid.removeWidget(tile)
+            tile.deleteLater()
+        if self._selected == label:
+            self._selected = "A"
+            self.tiles["A"].setChecked(True)
+        self.set_counts(self._counts, self._take_counts)
+
     def set_frame(self, image) -> None:
         if self.isVisible():
             self.preview.set_frame(image)
@@ -450,15 +509,43 @@ class TrainPage(QWidget):
         self.preview_pill.set_status("OFFLINE", "red")
         self._refresh()
 
-    def set_recording_started(self, label: str) -> None:
+    def set_capture_delay(self, seconds: float) -> None:
+        self.delay_combo.blockSignals(True)
+        index = self.delay_combo.findData(float(seconds))
+        if index >= 0:
+            self.delay_combo.setCurrentIndex(index)
+        self.delay_combo.blockSignals(False)
+
+    def _capture_delay_changed(self, index: int) -> None:
+        value = self.delay_combo.itemData(index)
+        if value is not None:
+            self.capture_delay_changed.emit(float(value))
+
+    def set_recording_started(self, label: str, delay: float = 0.0) -> None:
         self._recording = True
-        self.record_button.setText(f"Recording {display_name(label)}…")
+        self.record_button.setText("Get ready…" if delay > 0 else f"Recording {display_name(label)}…")
         self.record_button.setEnabled(False)
+        self.cancel_record_button.show()
         self.record_progress.setValue(0)
         self.record_progress.show()
-        self.record_status.setText("Hold this sign steady. Vary hand position between separate takes.")
+        self.record_status.setText(
+            f"Starting in {int(delay)} sec. Get both hands into frame."
+            if delay > 0
+            else "Hold this sign steady. Vary hand position between separate takes."
+        )
         self.duration_combo.setEnabled(False)
+        self.delay_combo.setEnabled(False)
         self._refresh()
+
+    def set_recording_countdown(self, label: str, remaining: int) -> None:
+        if remaining > 0:
+            self.record_button.setText(f"Get ready · {remaining}")
+            self.record_status.setText(
+                f"Recording {display_name(label)} in {remaining} sec. Place both hands in frame."
+            )
+        else:
+            self.record_button.setText(f"Recording {display_name(label)}…")
+            self.record_status.setText("Recording now. Hold the sign steady.")
 
     def set_recording_progress(self, label: str, count: int) -> None:
         self.record_progress.setValue(min(100, int(count / MAX_SAMPLES_PER_TAKE * 100)))
@@ -470,8 +557,10 @@ class TrainPage(QWidget):
         self._recording = False
         self.record_button.setText("Record sign")
         self.record_button.setEnabled(self._camera_live and not self._training)
+        self.cancel_record_button.hide()
         self.record_progress.hide()
         self.duration_combo.setEnabled(True)
+        self.delay_combo.setEnabled(True)
         if added:
             self.record_status.setText(
                 f"Added {added} samples for “{display_name(label)}”. "
@@ -522,8 +611,10 @@ class TrainPage(QWidget):
             return
         self._recording = False
         self.record_button.setText("Record sign")
+        self.cancel_record_button.hide()
         self.record_progress.hide()
         self.duration_combo.setEnabled(True)
+        self.delay_combo.setEnabled(True)
         self.record_status.setText("Recording cancelled.")
         self._refresh()
 
@@ -551,7 +642,8 @@ class TrainPage(QWidget):
         else:
             self.model_accuracy.setText("")
         self.use_personal.setEnabled(has_personal and active_kind != "user")
-        self.use_bundled.setEnabled(active_kind != "legacy")
+        self.save_model_button.setEnabled(has_personal)
+        self.load_model_button.setEnabled(True)
         if has_personal:
             self.use_personal.setObjectName(
                 "Primary" if active_kind != "user" else "Ghost"
@@ -565,14 +657,14 @@ class TrainPage(QWidget):
         self.use_personal.setEnabled(
             not switching and self._has_personal and self._active_kind != "user"
         )
-        self.use_bundled.setEnabled(not switching and self._active_kind != "legacy")
 
     # ---- events -------------------------------------------------------
     def _start_recording(self) -> None:
         if self._recording or not self._camera_live:
             return
         duration = float(self.duration_combo.currentData() or 3.0)
-        self.record_requested.emit(self._selected, duration)
+        delay = float(self.delay_combo.currentData() or 0.0)
+        self.record_requested.emit(self._selected, duration, delay)
 
     def _request_training(self) -> None:
         if self._training:

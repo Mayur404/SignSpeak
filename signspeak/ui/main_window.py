@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sys
 import time
+import shutil
+from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import (
@@ -14,6 +16,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -27,7 +30,7 @@ from PySide6.QtWidgets import (
 
 from ..composer import TextComposer
 from ..config import Settings, save_settings
-from ..labels import display_name, spoken_name
+from ..labels import display_name, is_custom_word_label, spoken_name
 from ..paths import USER_MODEL
 from ..recognition import (
     ModelLoadError,
@@ -59,7 +62,7 @@ def _window_icon() -> QIcon:
     painter.end()
     from .icons import icon_pixmap
 
-    hand = icon_pixmap("hand", "#06111D", 64)
+    hand = icon_pixmap("hand", "#FFFFFF", 64)
     painter = QPainter(pixmap)
     painter.drawPixmap(32, 32, hand)
     painter.end()
@@ -161,8 +164,8 @@ class MainWindow(QMainWindow):
         brand_text = QVBoxLayout()
         brand_text.setSpacing(0)
         title = QLabel("SignSpeak")
-        title.setStyleSheet("font-size: 19px; font-weight: 800; color: #F3F7FF;")
-        subtitle = QLabel("ASL · LIVE SPEECH")
+        title.setStyleSheet(f"font-size: 19px; font-weight: 700; color: {theme.TEXT};")
+        subtitle = QLabel("SIGN LANGUAGE · SPEECH")
         subtitle.setStyleSheet(
             f"font-size: 9px; font-weight: 700; color: {theme.FAINT}; letter-spacing: 1.5px;"
         )
@@ -214,9 +217,9 @@ class MainWindow(QMainWindow):
 
         side.addSpacing(10)
         tip = Inset(padding=13, spacing=7)
-        tip_title = QLabel("Make it yours")
+        tip_title = QLabel("Personalize your signs")
         tip_title.setObjectName("Value")
-        tip_text = QLabel("Record a few signs and train a model for your own hand.")
+        tip_text = QLabel("Teach a personal model the handshapes you use most.")
         tip_text.setObjectName("Muted")
         tip_text.setWordWrap(True)
         tip_button = QPushButton("Train a model")
@@ -297,8 +300,15 @@ class MainWindow(QMainWindow):
 
         train = self.train_page
         train.record_requested.connect(self.start_recording)
+        train.cancel_recording.connect(self.cancel_recording)
+        train.capture_delay_changed.connect(
+            lambda value: self.update_setting("capture_delay", value)
+        )
         train.train_requested.connect(self.start_training)
         train.activate_model.connect(self.activate_model)
+        train.save_model.connect(self.save_model_copy)
+        train.load_model.connect(self.load_model_copy)
+        train.remove_word_requested.connect(self.remove_custom_word)
         train.clear_label.connect(self.clear_label_data)
         train.clear_dataset.connect(self.clear_dataset)
         train.toast_requested.connect(self.show_toast)
@@ -315,6 +325,7 @@ class MainWindow(QMainWindow):
         tp.set_mirror(self.settings.mirror)
         self.settings_page.set_values(self.settings)
         self.train_page.set_counts(self.store.counts(), self.store.take_counts())
+        self.train_page.set_capture_delay(self.settings.capture_delay)
         self._sync_camera_combos()
         self._update_model_ui()
         self._update_text_ui()
@@ -388,6 +399,7 @@ class MainWindow(QMainWindow):
         self.worker.statusChanged.connect(self._on_camera_status)
         self.worker.error.connect(self.on_camera_error)
         self.worker.recordingProgress.connect(self.train_page.set_recording_progress)
+        self.worker.recordingCountdown.connect(self.train_page.set_recording_countdown)
         self.worker.recordingFinished.connect(self.on_recording_finished)
         self.worker.start()
 
@@ -583,24 +595,22 @@ class MainWindow(QMainWindow):
         self.speech.start()
 
     def _on_voices(self, voices: list) -> None:
+        available = {str(voice.get("id", "")) for voice in voices}
         voice_id = self.settings.tts_voice
+        if not voice_id or voice_id not in available:
+            voice_id = str(voices[0].get("id", "")) if voices else ""
+            self.settings.tts_voice = voice_id
+            self._schedule_save()
         if not voice_id:
-            indian_voice = next(
-                (
-                    voice for voice in voices
-                    if str(voice.get("language", "")).lower() == "en-in"
-                    or any(
-                        marker in str(voice.get("name", "")).lower()
-                        for marker in ("neerja", "prabhat", "english (india)")
-                    )
-                ),
-                None,
+            self.settings_page.set_voices([], "")
+            self._set_side(self.side_speech, "Unavailable", theme.AMBER)
+            return
+        if self.speech is not None:
+            self.speech.configure(
+                voice_id=voice_id,
+                rate=self.settings.tts_rate,
+                volume=self.settings.tts_volume,
             )
-            if indian_voice:
-                voice_id = str(indian_voice.get("id", ""))
-                if voice_id:
-                    self.settings.tts_voice = voice_id
-                    self._schedule_save()
         self.settings_page.set_voices(voices, voice_id)
         self._set_side(self.side_speech, "Ready", theme.GREEN)
 
@@ -625,13 +635,18 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Training
     # ------------------------------------------------------------------
-    def start_recording(self, label: str, duration: float) -> None:
+    def start_recording(self, label: str, duration: float, delay: float = 0.0) -> None:
         if self.worker is None or not self.worker.isRunning() or self._paused:
             self.show_toast("Start the camera before recording samples.", "info")
             self.train_page.set_recording_finished(label, 0)
             return
-        self.train_page.set_recording_started(label)
-        self.worker.start_recording(label, duration)
+        self.train_page.set_recording_started(label, delay)
+        self.worker.start_recording(label, duration, delay)
+
+    def cancel_recording(self) -> None:
+        if self.worker is not None:
+            self.worker.cancel_recording()
+        self.train_page.cancel_recording_ui()
 
     def on_recording_finished(self, label: str, samples) -> None:
         if self._closing:
@@ -720,6 +735,57 @@ class MainWindow(QMainWindow):
         self._update_model_ui()
         self.show_toast(f"Now using {classifier.info.name}.", "success", 2600)
 
+    def save_model_copy(self) -> None:
+        if not USER_MODEL.exists():
+            self.show_toast("Train a personal model before saving a copy.", "info")
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save personal model", "SignSpeak-model.joblib",
+            "SignSpeak model (*.joblib)",
+        )
+        if not path:
+            return
+        target = Path(path)
+        if target.suffix.lower() != ".joblib":
+            target = target.with_suffix(".joblib")
+        try:
+            shutil.copy2(USER_MODEL, target)
+        except OSError as exc:
+            self.show_toast(f"Could not save model: {exc}", "error", 5000)
+            return
+        self.show_toast(f"Model saved to {target.name}.", "success", 3000)
+
+    def load_model_copy(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load personal model", "", "SignSpeak model (*.joblib);;All files (*)"
+        )
+        if not path:
+            return
+        source = Path(path)
+        try:
+            # Validate before replacing the active model so a bad file cannot
+            # make the app fail on its next launch.
+            load_user_classifier(source)
+            USER_MODEL.parent.mkdir(parents=True, exist_ok=True)
+            temporary = USER_MODEL.with_suffix(".import.joblib")
+            shutil.copy2(source, temporary)
+            temporary.replace(USER_MODEL)
+            classifier = load_user_classifier()
+        except Exception as exc:
+            try:
+                temporary.unlink(missing_ok=True)
+            except (UnboundLocalError, OSError):
+                pass
+            self.show_toast(f"Could not load model: {exc}", "error", 6000)
+            return
+        self.classifier = classifier
+        self.settings.active_model = "user"
+        self._save_settings()
+        if self.worker is not None:
+            self.worker.set_engine(RecognitionEngine(classifier, self.settings))
+        self._update_model_ui()
+        self.show_toast(f"Loaded {source.name} and made it the active model.", "success", 4000)
+
     def _update_model_ui(self) -> None:
         info = self.classifier.info
         has_personal = USER_MODEL.exists()
@@ -749,6 +815,30 @@ class MainWindow(QMainWindow):
         self.store.clear_label(label)
         self.train_page.set_counts(self.store.counts(), self.store.take_counts())
         self.show_toast(f"Cleared samples for “{display_name(label)}”.", "info")
+
+    def remove_custom_word(self, label: str) -> None:
+        if not is_custom_word_label(label):
+            return
+        count = self.store.counts().get(label, 0)
+        word = display_name(label)
+        answer = QMessageBox.question(
+            self,
+            "Remove custom word",
+            f'Remove "{word}" and its {count} recorded sample(s) from the training dataset?\n\n'
+            "The currently trained model keeps this word until you train it again.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.store.clear_label(label)
+        self.train_page.remove_custom_word(label)
+        self.train_page.set_counts(self.store.counts(), self.store.take_counts())
+        self.show_toast(
+            f'"{word}" removed from the dataset. Retrain to update the active model.',
+            "success",
+            4200,
+        )
 
     def clear_dataset(self) -> None:
         if self.store.total() == 0:
@@ -811,9 +901,23 @@ class MainWindow(QMainWindow):
             self.worker.apply_settings(self.settings)
 
     def reset_defaults(self) -> None:
-        self.settings = Settings()
+        previous_camera = (self.settings.camera_source, self.settings.camera_index)
+        preferred_model = "legacy"
+        if USER_MODEL.exists():
+            try:
+                load_user_classifier()
+            except ModelLoadError:
+                pass
+            else:
+                preferred_model = "user"
+        self.settings = Settings(active_model=preferred_model)
+        camera_changed = previous_camera != (
+            self.settings.camera_source,
+            self.settings.camera_index,
+        )
         self._save_settings()
         self.settings_page.set_values(self.settings)
+        self.train_page.set_capture_delay(self.settings.capture_delay)
         self.translate_page.set_auto(self.settings.auto_word, self.settings.auto_sentence)
         self.translate_page.set_mirror(self.settings.mirror)
         self._sync_camera_combos()
@@ -823,11 +927,15 @@ class MainWindow(QMainWindow):
                 rate=self.settings.tts_rate,
                 volume=self.settings.tts_volume,
             )
-        if self.worker is not None:
+        if self.worker is not None and not camera_changed:
             self.worker.apply_settings(self.settings)
-        if self.classifier.info.kind != "legacy":
-            self.activate_model("legacy")
-        self.show_toast("Settings restored to defaults.", "success", 2600)
+        if self.classifier.info.kind != preferred_model:
+            self.activate_model(preferred_model)
+        else:
+            self._update_model_ui()
+        if camera_changed and self._start_camera_when_ready:
+            self.restart_camera()
+        self.show_toast("Optimal settings restored.", "success", 2600)
 
     def _schedule_save(self) -> None:
         self._save_timer.start()
@@ -879,16 +987,16 @@ class MainWindow(QMainWindow):
         super().showEvent(event)
         if not getattr(self, "_dark_title_done", False):
             self._dark_title_done = True
-            self._enable_dark_titlebar()
+            self._set_light_titlebar()
 
-    def _enable_dark_titlebar(self) -> None:
+    def _set_light_titlebar(self) -> None:
         if sys.platform != "win32":
             return
         try:
             import ctypes
 
             hwnd = int(self.winId())
-            value = ctypes.c_int(1)
+            value = ctypes.c_int(0)
             for attribute in (20, 19):
                 result = ctypes.windll.dwmapi.DwmSetWindowAttribute(
                     hwnd, attribute, ctypes.byref(value), ctypes.sizeof(value)

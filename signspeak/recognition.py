@@ -221,17 +221,19 @@ class Stabilizer:
 
     def __init__(
         self,
-        window: int = 12,
+        window: int = 8,
         threshold: float = 0.55,
-        hold_ms: int = 650,
+        hold_ms: int = 500,
         min_ratio: float = 0.60,
-        cooldown_ms: int = 250,
-        release_ms: int = 320,
+        min_margin: float = 0.025,
+        cooldown_ms: int = 200,
+        release_ms: int = 250,
     ):
         self.window_size = max(3, int(window))
         self.threshold = float(threshold)
         self.hold_ms = max(50, int(hold_ms))
         self.min_ratio = float(min_ratio)
+        self.min_margin = max(0.0, float(min_margin))
         self.cooldown_ms = max(0, int(cooldown_ms))
         self.release_ms = max(50, int(release_ms))
         self._window: deque[tuple[str | None, float]] = deque(maxlen=self.window_size)
@@ -283,7 +285,6 @@ class Stabilizer:
     def _release(self) -> None:
         self._armed = True
         self._committed_label = None
-        self._candidate_since = None
 
     def update(
         self, prediction: Prediction | None, hand_present: bool, now_ms: int
@@ -302,9 +303,13 @@ class Stabilizer:
         self._last_seen = now_ms
         self._none_since = None
         confidence = prediction.confidence if prediction else 0.0
+        runner_up = prediction.top[1][1] if prediction and len(prediction.top) > 1 else 0.0
+        decisive = prediction is not None and (
+            len(prediction.top) < 2 or confidence - runner_up >= self.min_margin
+        )
         raw_label = (
             prediction.label
-            if prediction is not None and confidence >= self.threshold
+            if decisive and confidence >= self.threshold
             else None
         )
         self._window.append((raw_label, confidence))

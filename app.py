@@ -44,10 +44,14 @@ def main() -> int:
     try:
         window = MainWindow(settings, start_camera=start_camera, enable_speech=enable_speech)
     except Exception as exc:
+        detail = str(exc)
+        normalized = detail.lower()
+        if "model" in normalized and any(term in normalized for term in ("missing", "not found", "no such file")):
+            detail += "\n\nIf a model file is missing, reinstall the app assets."
         QMessageBox.critical(
             None,
             "SignSpeak could not start",
-            f"{exc}\n\nIf a model file is missing, reinstall the app assets.",
+            detail,
         )
         return 1
 

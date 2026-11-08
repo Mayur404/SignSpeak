@@ -17,17 +17,17 @@ def _clamp(value: float, low: float, high: float) -> float:
 class Settings:
     # Camera
     camera_index: int = 0
-    camera_source: str = "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=1.sdp"
     camera_source: str = ""
     mirror: bool = True
-    inference_width: int = 640
+    inference_width: int = 800
+    capture_delay: float = 3.0
     # Recognition
     confidence: float = 0.55
-    hold_ms: int = 650
-    smoothing: int = 12
+    hold_ms: int = 500
+    smoothing: int = 8
     min_vote_ratio: float = 0.60
-    cooldown_ms: int = 250
-    release_ms: int = 320
+    cooldown_ms: int = 200
+    release_ms: int = 250
     # Speech
     auto_word: bool = True
     auto_sentence: bool = True
@@ -45,6 +45,7 @@ class Settings:
         self.camera_index = int(_clamp(self.camera_index, 0, 15))
         self.camera_source = str(getattr(self, "camera_source", "") or "").strip()
         self.inference_width = int(_clamp(self.inference_width, 320, 1280))
+        self.capture_delay = float(_clamp(self.capture_delay, 0.0, 10.0))
         self.confidence = float(_clamp(self.confidence, 0.20, 0.95))
         self.hold_ms = int(_clamp(self.hold_ms, 150, 2500))
         self.smoothing = int(_clamp(self.smoothing, 4, 40))

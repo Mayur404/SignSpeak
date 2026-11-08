@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 from PySide6.QtCore import QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
@@ -45,7 +47,7 @@ class SettingsPage(QWidget):
         root.setSpacing(16)
         header = PageHeader(
             "Settings",
-            "Tune recognition, speech and the camera. Changes are saved automatically.",
+            "Set up your camera, recognition pace and speech preferences.",
         )
         reset_button = QPushButton("Reset defaults")
         reset_button.setObjectName("Ghost")
@@ -97,7 +99,9 @@ class SettingsPage(QWidget):
         width_row.addStretch(1)
         width_row.addWidget(self.width_combo)
         camera_body.addWidget(row_widget(width_row, 36))
-        width_hint = QLabel("Lower is faster; 640 px is a good balance.")
+        width_hint = QLabel(
+            "640 px balances speed and detail. Use 800–960 px if hands look small; lower values run faster."
+        )
         width_hint.setObjectName("Muted")
         camera_body.addWidget(width_hint)
         self.mirror_toggle = ToggleRow(
@@ -116,7 +120,7 @@ class SettingsPage(QWidget):
             "Hold to type",
             200,
             2000,
-            650,
+            500,
             formatter=lambda v: f"{v} ms",
             subtitle="How long a sign must stay stable before it is typed.",
         )
@@ -126,7 +130,7 @@ class SettingsPage(QWidget):
             "Smoothing window",
             4,
             30,
-            12,
+            8,
             formatter=lambda v: f"{v} frames",
             subtitle="More frames = steadier but slightly slower.",
         )
@@ -148,15 +152,21 @@ class SettingsPage(QWidget):
         right_col.addWidget(recognition_card)
 
         # ---- speech -------------------------------------------------------
+        speech_description = (
+            "Choose a Microsoft Edge voice. Speech requires internet and sends the text to Microsoft's speech service."
+            if sys.platform == "win32" and sys.version_info >= (3, 11)
+            else "Choose an installed system voice. Speech runs locally; Linux commonly uses espeak-ng."
+        )
         speech_card, speech_body = self._card(
-            "Speech", "Choose an installed voice. Windows Natural voices, including Indian English, work offline after download."
+            "Speech",
+            speech_description,
         )
         voice_row = QHBoxLayout()
         voice_caption = QLabel("Voice")
         voice_caption.setObjectName("Value")
         self.voice_combo = QComboBox()
         self.voice_combo.setMinimumWidth(230)
-        self.voice_combo.addItem("System default", "")
+        self.voice_combo.setEnabled(False)
         self.voice_combo.currentIndexChanged.connect(self._voice_changed)
         voice_row.addWidget(voice_caption)
         voice_row.addStretch(1)
@@ -177,11 +187,12 @@ class SettingsPage(QWidget):
         self.volume_slider.valueChanged.connect(lambda v: self._emit("tts_volume", v))
         speech_body.addWidget(self.volume_slider)
         test_row = QHBoxLayout()
-        test_button = QPushButton("Test voice")
-        test_button.setObjectName("Ghost")
-        test_button.setIcon(make_icon("volume", theme.TEXT, 14))
-        test_button.clicked.connect(self.test_voice)
-        test_row.addWidget(test_button)
+        self.test_voice_button = QPushButton("Test voice")
+        self.test_voice_button.setObjectName("Ghost")
+        self.test_voice_button.setEnabled(False)
+        self.test_voice_button.setIcon(make_icon("volume", theme.TEXT, 14))
+        self.test_voice_button.clicked.connect(self.test_voice)
+        test_row.addWidget(self.test_voice_button)
         test_row.addStretch(1)
         speech_body.addWidget(row_widget(test_row, 36))
         speech_body.addWidget(HLine())
@@ -211,7 +222,7 @@ class SettingsPage(QWidget):
             "Minimum gap",
             100,
             2000,
-            250,
+            200,
             formatter=lambda v: f"{v} ms",
             subtitle="Safety delay between two typed signs.",
         )
@@ -221,7 +232,7 @@ class SettingsPage(QWidget):
             "Release time",
             100,
             1000,
-            320,
+            250,
             formatter=lambda v: f"{v} ms",
             subtitle="Time without a stable sign before it can repeat.",
         )
@@ -266,11 +277,16 @@ class SettingsPage(QWidget):
         about_card, about_body = self._card(
             "About SignSpeak", "Hand signs → letters → words → speech."
         )
+        speech_engine = (
+            "Microsoft Edge TTS (online)"
+            if sys.platform == "win32" and sys.version_info >= (3, 11)
+            else "System voices (local)"
+        )
         about = QLabel(
-            "Version 1.0 · offline desktop app<br><br>"
+            "Version 1.0 · local-first desktop app<br><br>"
             "<b>Vision</b> MediaPipe Tasks Hand Landmarker<br>"
             "<b>Recognition</b> scikit-learn (personal model)<br>"
-            "<b>Speech</b> Windows SAPI / pyttsx3<br>"
+            f"<b>Speech</b> {speech_engine}<br>"
             "<b>UI</b> Qt for Python (PySide6)<br><br>"
             "Inspired by the open-source Sign Language to Text and Speech project."
         )
@@ -378,7 +394,15 @@ class SettingsPage(QWidget):
         self._syncing = True
         try:
             self.voice_combo.clear()
-            self.voice_combo.addItem("System default", "")
+            self.voice_combo.setEnabled(bool(voices))
+            self.test_voice_button.setEnabled(bool(voices))
+            if not voices:
+                unavailable = (
+                    "Microsoft Edge voices unavailable"
+                    if sys.platform == "win32" and sys.version_info >= (3, 11)
+                    else "System voices unavailable"
+                )
+                self.voice_combo.addItem(unavailable, "")
             for voice in voices:
                 name = str(voice.get("name", "Voice"))
                 if len(name) > 42:

@@ -107,7 +107,7 @@ ICONS: dict[str, str] = {
 
 
 @lru_cache(maxsize=256)
-def make_icon(name: str, color: str = "#E9EFFA", size: int = 20) -> QIcon:
+def make_icon(name: str, color: str = "#202A25", size: int = 20) -> QIcon:
     body = ICONS.get(name, ICONS["info"]).replace("currentColor", color)
     svg = (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" '
@@ -126,5 +126,5 @@ def make_icon(name: str, color: str = "#E9EFFA", size: int = 20) -> QIcon:
     return QIcon(pixmap)
 
 
-def icon_pixmap(name: str, color: str = "#E9EFFA", size: int = 20) -> QPixmap:
+def icon_pixmap(name: str, color: str = "#202A25", size: int = 20) -> QPixmap:
     return make_icon(name, color, size).pixmap(QSize(size, size))

@@ -99,7 +99,7 @@ class Pill(QLabel):
         "green": theme.GREEN,
         "amber": theme.AMBER,
         "red": theme.RED,
-        "violet": "#C4B5FD",
+        "violet": theme.VIOLET,
         "muted": theme.MUTED,
     }
 
@@ -219,7 +219,7 @@ class ToggleSwitch(QAbstractButton):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
         if self._pos > 0.001:
-            base = QColor("#22344E")
+            base = QColor("#DCE5E0")
             target = QColor(theme.ACCENT)
             mix = self._pos
             color = QColor(
@@ -231,14 +231,14 @@ class ToggleSwitch(QAbstractButton):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(rect, 13, 13)
         else:
-            painter.setBrush(QColor("#1A2A41"))
-            painter.setPen(QPen(QColor("#2A3E59"), 1))
+            painter.setBrush(QColor("#E8EDE9"))
+            painter.setPen(QPen(QColor(theme.BORDER), 1))
             painter.drawRoundedRect(rect, 13, 13)
 
         travel = self.width() - 8 - 18
         knob_x = 4 + 9 + self._pos * travel
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#FFFFFF" if self.isChecked() else "#93A6BF"))
+        painter.setBrush(QColor("#FFFFFF" if self.isChecked() else "#7D8982"))
         painter.drawEllipse(QPointF(knob_x, self.height() / 2), 9, 9)
         painter.end()
 
@@ -401,7 +401,7 @@ class VideoView(QWidget):
         path.addRoundedRect(rect, 17, 17)
         painter.setClipPath(path)
 
-        painter.fillRect(rect, QColor("#0A1421"))
+        painter.fillRect(rect, QColor("#E9EEEB"))
 
         if self._image is not None and not self._image.isNull():
             image = self._image
@@ -468,7 +468,7 @@ class RoundedImage(QWidget):
         path = QPainterPath()
         path.addRoundedRect(rect, 14, 14)
         painter.setClipPath(path)
-        painter.fillRect(rect, QColor("#0A1421"))
+        painter.fillRect(rect, QColor("#F4F6F4"))
         if self._image is not None and not self._image.isNull():
             scaled = self._image.scaled(
                 rect.size().toSize(),
@@ -529,7 +529,7 @@ class SignDial(QWidget):
 
         # Track
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(QColor("#17263B"), 9, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.setPen(QPen(QColor("#E0E6E2"), 9, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawEllipse(outer)
 
         if self._progress > 0.001:
@@ -543,8 +543,8 @@ class SignDial(QWidget):
             )
 
         # Inner disc
-        painter.setPen(QPen(QColor("#1B2B43"), 1))
-        painter.setBrush(QColor("#0A1421"))
+        painter.setPen(QPen(QColor(theme.BORDER), 1))
+        painter.setBrush(QColor("#FFFFFF"))
         painter.drawEllipse(inner)
 
         text = display_name(self._label) if self._label else "—"
@@ -622,7 +622,7 @@ class ConfidenceBar(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(0, 0, self.width(), self.height())
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#16253A"))
+        painter.setBrush(QColor("#E4EAE6"))
         painter.drawRoundedRect(rect, 4, 4)
         if self._value > 0:
             fill = QRectF(rect.left(), rect.top(), rect.width() * self._value, rect.height())
@@ -659,13 +659,15 @@ class LetterTile(QAbstractButton):
         checked = self.isChecked()
         hover = self.underMouse()
         if checked:
-            painter.setBrush(QColor(34, 211, 238, 34))
+            selected = QColor(theme.ACCENT)
+            selected.setAlpha(24)
+            painter.setBrush(selected)
             painter.setPen(QPen(QColor(theme.ACCENT), 1.4))
         elif hover:
-            painter.setBrush(QColor("#13243A"))
+            painter.setBrush(QColor("#F1F5F2"))
             painter.setPen(QPen(QColor(theme.BORDER_STRONG), 1))
         else:
-            painter.setBrush(QColor("#0B1626"))
+            painter.setBrush(QColor("#FFFFFF"))
             painter.setPen(QPen(QColor(theme.BORDER), 1))
         painter.drawRoundedRect(rect, 12, 12)
 
@@ -730,7 +732,7 @@ class LogoMark(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(theme.ACCENT))
         painter.drawRoundedRect(rect, 13, 13)
-        pixmap = icon_pixmap("hand", "#06111D", 24)
+        pixmap = icon_pixmap("hand", "#FFFFFF", 24)
         painter.drawPixmap(
             int(rect.center().x() - 12), int(rect.center().y() - 12), pixmap
         )

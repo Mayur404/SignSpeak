@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import os
+import math
 import sys
 import tempfile
 import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
+from urllib.parse import urlsplit, urlunsplit
 
 # Configure FFmpeg before cv2 loads its video backends. The stream reader
 # discards stale decoded frames, so TCP can remain reliable without a backlog.
@@ -90,6 +92,80 @@ VIOLET = (246, 92, 139)      # #8B5CF6 in BGR
 WHITE = (245, 248, 252)
 DARK = (8, 12, 20)
 GREEN = (153, 211, 52)       # #34D399 in BGR
+
+SPARSH_HOST = "192.168.128.10"
+SPARSH_PORT = 554
+SPARSH_STREAM_PATHS = {
+    "sub": (
+        "/h264/ch1/sub/av_stream",
+        "/avstream/channel=1/stream=1.sdp",
+    ),
+    "main": (
+        "/h264/ch1/main/av_stream",
+        "/avstream/channel=1/stream=0.sdp",
+    ),
+}
+SPARSH_CREDENTIALS = "admin:admin123"
+
+
+def sparsh_stream_urls() -> list[tuple[str, str]]:
+    """Return the preferred sub/main RTSP URLs shown in the camera picker."""
+    authority = f"{SPARSH_CREDENTIALS}@{SPARSH_HOST}:{SPARSH_PORT}"
+    return [
+        (
+            f"rtsp://{authority}{SPARSH_STREAM_PATHS['sub'][0]}",
+            "Sparsh CCTV (Substream - recommended)",
+        ),
+        (
+            f"rtsp://{authority}{SPARSH_STREAM_PATHS['main'][0]}",
+            "Sparsh CCTV (Mainstream - higher bandwidth)",
+        ),
+    ]
+
+
+def _camera_candidates(source: str) -> list[str]:
+    """Try configured Sparsh URL variants while preserving the chosen stream."""
+    try:
+        parsed = urlsplit(source)
+        port = parsed.port or SPARSH_PORT
+    except ValueError:
+        return [source]
+    if parsed.scheme.lower() != "rtsp" or parsed.hostname != SPARSH_HOST or port != SPARSH_PORT:
+        return [source]
+
+    selected_mode = next(
+        (mode for mode, paths in SPARSH_STREAM_PATHS.items() if parsed.path in paths),
+        None,
+    )
+    if selected_mode is None:
+        return [source]
+
+    modes = (selected_mode, "main" if selected_mode == "sub" else "sub")
+    candidates = [source]
+    for mode in modes:
+        for path in SPARSH_STREAM_PATHS[mode]:
+            candidate = urlunsplit(
+                (parsed.scheme, parsed.netloc, path, parsed.query, parsed.fragment)
+            )
+            if candidate not in candidates:
+                candidates.append(candidate)
+    return candidates
+
+
+def _safe_camera_source(source: str) -> str:
+    """Hide credentials and query tokens in user-facing connection errors."""
+    try:
+        parsed = urlsplit(source)
+        host = parsed.hostname
+        if not host:
+            return "camera stream"
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
+        if parsed.port:
+            host += f":{parsed.port}"
+        return urlunsplit((parsed.scheme, host, parsed.path, "", ""))
+    except ValueError:
+        return "camera stream"
 
 
 _MEDIAPIPE_LOG_LOCK = threading.RLock()
@@ -342,6 +418,7 @@ class CameraWorker(QThread):
     statusChanged = Signal(str)
     error = Signal(str)
     recordingProgress = Signal(str, int)
+    recordingCountdown = Signal(str, int)
     recordingFinished = Signal(str, object)
 
     def __init__(self, settings: Settings, engine: RecognitionEngine, parent=None):
@@ -353,7 +430,9 @@ class CameraWorker(QThread):
         self._recognition_enabled = True
         self._recording_lock = threading.Lock()
         self._rec_label: str | None = None
+        self._rec_start_at = 0.0
         self._rec_until = 0.0
+        self._rec_countdown_last = 0
         self._rec_samples: list[np.ndarray] = []
         self._rec_last = 0.0
         self._last_timestamp = 0
@@ -382,10 +461,12 @@ class CameraWorker(QThread):
     def set_engine(self, engine: RecognitionEngine) -> None:
         self.engine = engine
 
-    def start_recording(self, label: str, duration: float = 3.0) -> None:
+    def start_recording(self, label: str, duration: float = 3.0, delay: float = 0.0) -> None:
         with self._recording_lock:
             self._rec_label = label
-            self._rec_until = time.monotonic() + max(0.5, duration)
+            self._rec_start_at = time.monotonic() + max(0.0, delay)
+            self._rec_until = self._rec_start_at + max(0.5, duration)
+            self._rec_countdown_last = math.ceil(max(0.0, delay))
             self._rec_samples = []
             self._rec_last = 0.0
 
@@ -438,17 +519,19 @@ class CameraWorker(QThread):
                 failures = 0
 
                 now = time.monotonic()
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 height, width = frame.shape[:2]
                 infer_width = min(int(self.settings.inference_width), width)
                 if infer_width < width:
-                    infer = cv2.resize(
-                        rgb,
+                    infer_bgr = cv2.resize(
+                        frame,
                         (infer_width, int(height * infer_width / width)),
                         interpolation=cv2.INTER_AREA,
                     )
                 else:
-                    infer = rgb
+                    infer_bgr = frame
+                # Convert only the inference-sized frame. On a 4K Sparsh feed
+                # this avoids a full-resolution color conversion every frame.
+                infer = cv2.cvtColor(infer_bgr, cv2.COLOR_BGR2RGB)
 
                 timestamp = max(self._last_timestamp + 1, int((now - start) * 1000))
                 self._last_timestamp = timestamp
@@ -514,17 +597,30 @@ class CameraWorker(QThread):
 
     def _collect_recording(self, points: np.ndarray | None, now: float) -> None:
         progress = None
+        countdown = None
         finished = False
+        waiting = False
         with self._recording_lock:
             label = self._rec_label
             if not label:
                 return
-            if now >= self._rec_until or len(self._rec_samples) >= MAX_SAMPLES_PER_TAKE:
+            remaining = max(0, math.ceil(self._rec_start_at - now))
+            if remaining != self._rec_countdown_last:
+                self._rec_countdown_last = remaining
+                countdown = remaining
+            waiting = now < self._rec_start_at
+            if waiting:
+                pass
+            elif now >= self._rec_until or len(self._rec_samples) >= MAX_SAMPLES_PER_TAKE:
                 finished = True
             elif points is not None and now - self._rec_last >= 0.18:
                 self._rec_samples.append(dual_hand_features(points))
                 self._rec_last = now
                 progress = len(self._rec_samples)
+        if countdown is not None:
+            self.recordingCountdown.emit(label, countdown)
+        if waiting:
+            return
         if progress is not None:
             self.recordingProgress.emit(label, progress)
         if finished:
@@ -534,27 +630,11 @@ class CameraWorker(QThread):
         source = (getattr(self.settings, "camera_source", "") or "").strip()
         if source:
             # Handle RTSP / IP camera stream
-            import os
             # Set this before opening each RTSP capture. Avoid FFmpeg's
             # no-buffer/low-delay decoder flags, which can reject fragmented
             # H.264 packets from this camera.
             os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
-
-            candidates = [source]
-            if "192.168.128.10" in source or "stream1" in source or "stream0" in source:
-                sp_sub = "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=1.sdp"
-                sp_main = "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=0.sdp"
-                # Honor the stream selected in the UI, then use the other
-                # Sparsh stream only if the selected one cannot be opened.
-                if "/stream=1." in source:
-                    alternate = sp_main
-                elif "/stream=0." in source:
-                    alternate = sp_sub
-                else:
-                    alternate = sp_sub
-                candidates = [source]
-                if alternate not in candidates:
-                    candidates.append(alternate)
+            candidates = _camera_candidates(source)
 
             cap = None
             for url in candidates:
@@ -577,9 +657,10 @@ class CameraWorker(QThread):
                     cap = None
 
             if cap is None or not cap.isOpened():
+                safe_source = _safe_camera_source(source)
                 self.error.emit(
-                    f"Could not connect to camera stream:\n{source}\n\n"
-                    "Please check the Ethernet link to 192.168.128.10."
+                    f"Could not connect to camera stream:\n{safe_source}\n\n"
+                    "Check the camera address, network route, RTSP port, credentials, and stream path."
                 )
                 if cap is not None:
                     cap.release()
@@ -636,20 +717,10 @@ class CameraProbe(QThread):
 
         found: list[tuple[int | str, str]] = []
 
-        # Check if Sparsh CCTV camera is reachable on Ethernet link
+        # Offer Sparsh streams only when its configured RTSP port is reachable.
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(0.4)
-            if sock.connect_ex(("192.168.128.10", 554)) == 0:
-                found.append((
-                    "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=1.sdp",
-                    "Sparsh CCTV (720p Substream - Fast)",
-                ))
-                found.append((
-                    "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=0.sdp",
-                    "Sparsh CCTV (4K Mainstream - higher latency)",
-                ))
-            sock.close()
+            with socket.create_connection((SPARSH_HOST, SPARSH_PORT), timeout=0.4):
+                found.extend(sparsh_stream_urls())
         except Exception:
             pass
 

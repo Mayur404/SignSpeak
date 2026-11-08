@@ -1,5 +1,14 @@
 # Third-party notices
 
+## edge-tts
+
+On Windows with Python 3.11 or later, SignSpeak uses the `edge-tts` Python package to request online neural speech from
+Microsoft Edge's text-to-speech service. The package is distributed under the
+[GNU General Public License v3.0](https://github.com/rany2/edge-tts/blob/master/LICENSE).
+Microsoft's speech service is external to this project and may change or become
+unavailable. Other supported platforms use locally installed voices through
+`pyttsx3`.
+
 ## Sign-Language-to-Text-and-Speech
 
 SignSpeak's bundled classifier and ASL reference material are based on

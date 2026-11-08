@@ -64,7 +64,7 @@ class TranslatePage(QWidget):
 
         self.header = PageHeader(
             "Live translate",
-            "Hold an ASL sign steady — SignSpeak types it, builds words and speaks them aloud.",
+            "Sign naturally. Your handshapes become text, ready to edit or speak.",
         )
         self.model_pill = Pill("Bundled model", "violet")
         self.camera_pill = Pill("STARTING", "amber")
@@ -127,7 +127,7 @@ class TranslatePage(QWidget):
         hint_icon.setPixmap(make_icon("info", theme.FAINT, 14).pixmap(14, 14))
         hint_row.addWidget(hint_icon)
         hint = QLabel(
-            "Keep one hand in frame, palm towards the camera. "
+            "Keep your hand in frame and change signs directly—no need to move out of view. "
             "Thumbs up finishes a word · “I love you” finishes a sentence."
         )
         hint.setObjectName("Muted")
@@ -160,11 +160,12 @@ class TranslatePage(QWidget):
         detect_col.addWidget(self.status_hint)
         detect_col.addSpacing(4)
         conf_row = QHBoxLayout()
-        conf_caption = QLabel("Top-class score")
+        conf_caption = QLabel("Model signal")
         conf_caption.setObjectName("Muted")
         conf_caption.setToolTip(
             "The classifier's top score is diagnostic, not recognition accuracy. "
-            "The app commits signs using stable votes over time."
+            "Frames with a near tie between the top two signs are ignored; "
+            "the app commits using stable votes over time."
         )
         self.conf_value = QLabel("—")
         self.conf_value.setObjectName("Accent")
@@ -216,7 +217,7 @@ class TranslatePage(QWidget):
         word_actions.addStretch(1)
         self.type_button = QPushButton("Type sign")
         self.type_button.setObjectName("Primary")
-        self.type_button.setIcon(make_icon("keyboard", "#06111D", 15))
+        self.type_button.setIcon(make_icon("keyboard", "#FFFFFF", 15))
         self.type_button.setToolTip("Type the sign you are currently holding (Enter)")
         self.type_button.clicked.connect(self.manual_commit)
         word_actions.addWidget(self.type_button)
@@ -253,7 +254,7 @@ class TranslatePage(QWidget):
         footer.setSpacing(10)
         self.speak_button = QPushButton("Speak sentence")
         self.speak_button.setObjectName("Primary")
-        self.speak_button.setIcon(make_icon("volume", "#06111D", 15))
+        self.speak_button.setIcon(make_icon("volume", "#FFFFFF", 15))
         self.speak_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.speak_button.clicked.connect(self.speak_toggled)
         footer.addWidget(self.speak_button)
@@ -413,7 +414,7 @@ class TranslatePage(QWidget):
         self._speaking = speaking
         self.speak_button.setText("Stop speaking" if speaking else "Speak sentence")
         self.speak_button.setIcon(
-            make_icon("stop" if speaking else "volume", "#06111D", 15)
+            make_icon("stop" if speaking else "volume", "#FFFFFF", 15)
         )
 
     def set_auto(self, word: bool, sentence: bool) -> None:

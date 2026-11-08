@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -20,6 +21,12 @@ from signspeak.recognition import (
     load_user_classifier,
 )
 from signspeak.trainer import DatasetStore, train_model
+from signspeak.vision import (
+    CameraProbe,
+    _camera_candidates,
+    _safe_camera_source,
+    sparsh_stream_urls,
+)
 
 
 class FeatureTests(unittest.TestCase):
@@ -138,6 +145,31 @@ class RecognitionTests(unittest.TestCase):
                     for t in range(550, 1001, 50)]
         self.assertEqual(repeated.count("A"), 1)
 
+    def test_stabilizer_ignores_ambiguous_frame_predictions(self):
+        stabilizer = Stabilizer(window=5, threshold=0.0, hold_ms=100, min_ratio=0.6)
+        ambiguous = Prediction("A", 0.52, [("A", 0.52), ("B", 0.50)])
+        states = [stabilizer.update(ambiguous, True, t) for t in range(0, 400, 50)]
+        self.assertTrue(all(state.stable_label is None for state in states))
+        self.assertFalse(any(state.committed for state in states))
+
+    def test_stabilizer_switches_sign_without_hand_leaving_frame(self):
+        stabilizer = Stabilizer(
+            window=5, threshold=0.0, hold_ms=100, min_ratio=0.6,
+            cooldown_ms=0, release_ms=300,
+        )
+        sign_a = Prediction("A", 0.95, [("A", 0.95)])
+        sign_b = Prediction("B", 0.95, [("B", 0.95)])
+        commits = []
+        for now in range(0, 301, 50):
+            state = stabilizer.update(sign_a, True, now)
+            if state.committed:
+                commits.append(state.committed)
+        for now in range(350, 701, 50):
+            state = stabilizer.update(sign_b, True, now)
+            if state.committed:
+                commits.append(state.committed)
+        self.assertEqual(commits, ["A", "B"])
+
     def test_bundled_model_predicts_legacy_vector(self):
         classifier = load_legacy_classifier()
         points = np.zeros((21, 3), dtype=np.float32)
@@ -216,6 +248,43 @@ class SettingsTests(unittest.TestCase):
             save_settings(settings, path)
             loaded = load_settings(path)
             self.assertEqual(loaded.camera_source, settings.camera_source)
+
+
+class CameraUrlTests(unittest.TestCase):
+    def test_probe_offers_sparsh_streams_when_rtsp_port_is_reachable(self):
+        results = []
+        probe = CameraProbe(skip_source=0)
+        probe.finishedList.connect(results.append)
+        with patch("socket.create_connection"), patch(
+            "signspeak.vision.cv2.VideoCapture", return_value=Mock(isOpened=lambda: False)
+        ):
+            probe.run()
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0][:2], sparsh_stream_urls())
+
+    def test_sparsh_picker_offers_both_streams(self):
+        urls = sparsh_stream_urls()
+        self.assertEqual(len(urls), 2)
+        self.assertIn("/sub/av_stream", urls[0][0])
+        self.assertIn("/main/av_stream", urls[1][0])
+
+    def test_sparsh_fallback_keeps_selected_stream_first(self):
+        substream = sparsh_stream_urls()[0][0]
+        candidates = _camera_candidates(substream)
+        self.assertEqual(candidates[0], substream)
+        self.assertIn("/avstream/channel=1/stream=1.sdp", candidates[1])
+        self.assertIn("/main/av_stream", candidates[2])
+
+    def test_other_custom_rtsp_url_is_not_rewritten(self):
+        source = "rtsp://camera.local:8554/laptop"
+        self.assertEqual(_camera_candidates(source), [source])
+
+    def test_camera_error_url_does_not_expose_credentials_or_query(self):
+        source = "rtsp://admin:secret@192.168.1.10:554/live?token=private"
+        self.assertEqual(
+            _safe_camera_source(source),
+            "rtsp://192.168.1.10:554/live",
+        )
 
 
 if __name__ == "__main__":

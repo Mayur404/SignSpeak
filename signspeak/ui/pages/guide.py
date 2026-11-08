@@ -17,8 +17,8 @@ class GuidePage(QWidget):
 
         root.addWidget(
             PageHeader(
-                "ASL alphabet & digits",
-                "American Sign Language letter and number reference.",
+                "Sign reference",
+                "A quick visual guide to the ASL alphabet and numbers.",
             )
         )
 
