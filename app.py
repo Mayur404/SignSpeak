@@ -91,8 +91,8 @@ def run_desktop_app(args: list[str]) -> int:
     return app.exec()
 
 
-def run_web_app(host: str = "0.0.0.0", port: int = 8080, camera: str | None = None, open_browser: bool = True) -> int:
-    """Run the SignSpeak Web Server on port 8080."""
+def run_web_app(host: str = "0.0.0.0", port: int = 8090, camera: str | None = None, open_browser: bool = True) -> int:
+    """Run the SignSpeak Web Server (default port 8090; 8080 is NiralOS)."""
     from signspeak.web.server import run_server
     from signspeak.web.streamer import WebStreamEngine
 
@@ -119,7 +119,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="SignSpeak — ASL & Gesture Recognition")
     parser.add_argument("--desktop", action="store_true", help="Launch the legacy Qt desktop GUI")
     parser.add_argument("--host", default=os.environ.get("WEB_HOST", "0.0.0.0"), help="Host to bind (default: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=int(os.environ.get("WEB_PORT", 8080)), help="Port to bind (default: 8080)")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("WEB_PORT", 8090)), help="Port to bind (default: 8090)")
     parser.add_argument("--camera", type=str, default=None, help="Override camera RTSP URL or device index")
     parser.add_argument("--no-browser", action="store_true", help="Do not open browser automatically")
 

@@ -30,3 +30,4 @@ data/*
 Thumbs.db
 Desktop.ini
 signspeak.pid
+signspeak.port

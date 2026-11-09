@@ -22,7 +22,7 @@ if [[ -f signspeak.pid ]]; then
         fi
         STOPPED=1
     fi
-    rm -f signspeak.pid
+    rm -f signspeak.pid signspeak.port
 fi
 
 # Fallback check for any dangling app.py processes

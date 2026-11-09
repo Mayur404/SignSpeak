@@ -6,9 +6,11 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-PORT="${WEB_PORT:-8080}"
+# shellcheck source=scripts/port.sh
+source scripts/port.sh
 
 if [[ -f signspeak.pid ]] && kill -0 "$(cat signspeak.pid)" 2>/dev/null; then
+    PORT=$(cat signspeak.port 2>/dev/null || echo 8090)
     echo "SignSpeak is already running (PID: $(cat signspeak.pid))."
     for ip in $(hostname -I 2>/dev/null); do echo "  http://$ip:$PORT"; done
     exit 0
@@ -32,6 +34,9 @@ if [[ ! -x .venv/bin/python ]]; then
     ./setup_ubuntu.sh
 fi
 PYTHON=.venv/bin/python
+
+PORT=$(pick_port)
+echo "$PORT" > signspeak.port
 
 # 3. Firewall: let other machines on the network reach the dashboard.
 if command -v ufw >/dev/null 2>&1; then

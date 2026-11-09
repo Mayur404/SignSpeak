@@ -72,10 +72,11 @@ if [[ -t 0 ]]; then
     fi
 fi
 
-# Let other machines on the network open the dashboard (port 8080).
+# Let other machines on the network open the dashboard (default port 8090;
+# 8080 is the NiralOS console on the edge VM).
 if command -v ufw >/dev/null 2>&1 && $SUDO ufw status 2>/dev/null | grep -q "Status: active"; then
-    echo "==> Opening port 8080 in the ufw firewall"
-    $SUDO ufw allow 8080/tcp
+    echo "==> Opening ports 8090-8092 in the ufw firewall"
+    $SUDO ufw allow 8090:8092/tcp
 fi
 
 echo
