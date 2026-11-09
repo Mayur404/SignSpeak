@@ -72,6 +72,12 @@ if [[ -t 0 ]]; then
     fi
 fi
 
+# Let other machines on the network open the dashboard (port 8080).
+if command -v ufw >/dev/null 2>&1 && $SUDO ufw status 2>/dev/null | grep -q "Status: active"; then
+    echo "==> Opening port 8080 in the ufw firewall"
+    $SUDO ufw allow 8080/tcp
+fi
+
 echo
 echo "==> Verifying the install"
 .venv/bin/python - <<'EOF'

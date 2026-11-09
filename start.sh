@@ -33,10 +33,15 @@ if [[ ! -x .venv/bin/python ]]; then
 fi
 PYTHON=.venv/bin/python
 
-# 3. Firewall: let the PC reach the dashboard (non-interactive, best effort).
-if command -v ufw >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-    if sudo -n ufw status 2>/dev/null | grep -q "Status: active"; then
-        sudo -n ufw allow "$PORT"/tcp >/dev/null 2>&1 || true
+# 3. Firewall: let other machines on the network reach the dashboard.
+if command -v ufw >/dev/null 2>&1; then
+    if sudo -n true 2>/dev/null; then
+        if sudo -n ufw status 2>/dev/null | grep -q "Status: active"; then
+            sudo -n ufw allow "$PORT"/tcp >/dev/null 2>&1 || true
+        fi
+    elif ! ufw status 2>/dev/null | grep -qE "^${PORT}(/tcp)?\s+ALLOW"; then
+        echo "Tip: if the dashboard does not open from your PC, allow the port once with:"
+        echo "     sudo ufw allow ${PORT}/tcp"
     fi
 fi
 
