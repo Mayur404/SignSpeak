@@ -3,29 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SignSpeak — 5G Edge ASL Recognition</title>
+  <title>SignSpeak — Sign Language to Speech</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&family=Cascadia+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #070A10;
-      --card-bg: rgba(15, 23, 42, 0.75);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --card-hover: rgba(255, 255, 255, 0.12);
-      --cyan: #22D3EE;
-      --cyan-glow: rgba(34, 211, 238, 0.35);
-      --emerald: #10B981;
-      --emerald-glow: rgba(16, 185, 129, 0.3);
-      --violet: #8B5CF6;
-      --violet-glow: rgba(139, 92, 246, 0.3);
-      --coral: #F43F5E;
-      --amber: #F59E0B;
-      --text: #F8FAFC;
-      --text-muted: #94A3B8;
-      --text-dim: #64748B;
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --bg: #F3F5F2;
+      --bg-soft: #FFFFFF;
+      --card: #FFFFFF;
+      --card-2: #F7F9F7;
+      --card-3: #EDF2EF;
+      --inset: #F8FAF8;
+      --border: #DDE4DF;
+      --border-strong: #BFCBC3;
+      --text: #202A25;
+      --muted: #5E6C64;
+      --faint: #7D8982;
+      --accent: #287A68;
+      --accent-dim: #236957;
+      --accent-soft: #EAF4F1;
+      --violet: #70618F;
+      --violet-soft: #F0EDF5;
+      --green: #28784B;
+      --green-soft: #EAF4ED;
+      --amber: #956A18;
+      --amber-soft: #FAF2E3;
+      --red: #B44740;
+      --red-soft: #F9ECEA;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'Cascadia Mono', 'JetBrains Mono', monospace;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,230 +43,329 @@
       font-family: var(--font-sans);
       min-height: 100vh;
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       overflow-x: hidden;
-      background-image: 
-        radial-gradient(ellipse at 15% 0%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 85% 10%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 100%, rgba(16, 185, 129, 0.05) 0%, transparent 60%);
     }
 
-    /* Top Navigation */
-    header {
+    /* ====================================================================
+       1. SIDEBAR (Exact match to PySide6 QFrame#Sidebar)
+       ==================================================================== */
+    aside#sidebar {
+      width: 240px;
+      min-width: 240px;
+      background: var(--bg-soft);
+      border-right: 1px solid var(--border);
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 24px;
-      background: rgba(11, 15, 25, 0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--card-border);
+      flex-direction: column;
+      padding: 22px 18px 18px 18px;
+      gap: 12px;
+      height: 100vh;
       position: sticky;
       top: 0;
-      z-index: 100;
+      user-select: none;
     }
 
-    .brand {
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 8px;
+    }
+
+    .logomark {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      font-size: 19px;
+      box-shadow: 0 2px 6px rgba(40, 122, 104, 0.25);
+    }
+
+    .brand-text h1 {
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.1;
+    }
+
+    .brand-text p {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--faint);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--faint);
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+
+    /* Nav Buttons */
+    .nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-btn {
       display: flex;
       align-items: center;
       gap: 12px;
-      text-decoration: none;
-      color: inherit;
-    }
-
-    .brand-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, var(--cyan), var(--violet));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      box-shadow: 0 0 16px var(--cyan-glow);
-    }
-
-    .brand-title {
-      font-size: 1.25rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      background: linear-gradient(90deg, #FFFFFF, #CBD5E1);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .brand-badge {
-      font-size: 0.68rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: rgba(34, 211, 238, 0.12);
-      border: 1px solid rgba(34, 211, 238, 0.3);
-      color: var(--cyan);
-    }
-
-    .header-status {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .status-pill {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--card-border);
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 0.82rem;
-      font-family: var(--font-mono);
-      color: var(--text-muted);
-    }
-
-    .pulse-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--emerald);
-      box-shadow: 0 0 10px var(--emerald);
-      animation: pulse 2s infinite;
-    }
-
-    .pulse-dot.offline {
-      background: var(--coral);
-      box-shadow: 0 0 10px var(--coral);
-      animation: none;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.85); }
-    }
-
-    .nav-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 0.85rem;
+      height: 42px;
+      padding: 0 14px;
+      border-radius: 9px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13.5px;
       font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: 1px solid var(--card-border);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text);
       font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: left;
     }
 
-    .btn:hover {
-      background: var(--card-hover);
-      border-color: rgba(255, 255, 255, 0.2);
+    .nav-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: var(--muted);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: stroke 0.15s ease;
     }
 
-    .btn-primary {
-      background: linear-gradient(135deg, var(--cyan), #0284C7);
-      color: #070A10;
+    .nav-btn:hover {
+      background: #F3F5F2;
+      color: var(--text);
+    }
+
+    .nav-btn.active {
+      background: var(--accent-soft);
+      border-color: #C9E1D9;
+      color: var(--accent);
       font-weight: 600;
-      border: none;
-      box-shadow: 0 0 12px var(--cyan-glow);
     }
 
-    .btn-primary:hover {
-      opacity: 0.92;
-      box-shadow: 0 0 20px var(--cyan-glow);
+    .nav-btn.active svg {
+      stroke: var(--accent);
     }
 
-    .btn-emerald {
-      background: rgba(16, 185, 129, 0.15);
-      border-color: rgba(16, 185, 129, 0.4);
-      color: var(--emerald);
-    }
-
-    .btn-emerald:hover {
-      background: rgba(16, 185, 129, 0.25);
-    }
-
-    .btn-coral {
-      background: rgba(244, 63, 94, 0.15);
-      border-color: rgba(244, 63, 94, 0.4);
-      color: var(--coral);
-    }
-
-    .btn-sm {
-      padding: 6px 12px;
-      font-size: 0.78rem;
-    }
-
-    /* Main Grid Layout */
-    main {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      gap: 20px;
-      padding: 20px;
-      max-width: 1720px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    @media (max-width: 1024px) {
-      main { grid-template-columns: 1fr; }
-    }
-
-    /* Video Column */
-    .stream-column {
+    /* Inset Box */
+    .inset-card {
+      background: var(--inset);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 8px;
     }
 
-    .card {
-      background: var(--card-bg);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-    }
-
-    .card-header {
+    .status-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--card-border);
-      background: rgba(255, 255, 255, 0.02);
+      font-size: 10px;
     }
 
-    .card-title {
-      font-size: 0.92rem;
-      font-weight: 600;
+    .status-row .lbl {
+      color: var(--faint);
+    }
+
+    .status-row .val {
+      font-weight: 700;
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+
+    .status-row .val.green { color: var(--green); }
+    .status-row .val.amber { color: var(--amber); }
+
+    /* Tip Card */
+    .tip-card {
+      background: var(--inset);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 13px;
       display: flex;
-      align-items: center;
-      gap: 8px;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .tip-card h4 {
+      font-size: 13px;
+      font-weight: 600;
       color: var(--text);
     }
 
+    .tip-card p {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .tip-btn {
+      align-self: flex-start;
+      margin-top: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 2px 0;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 9.5px;
+      color: var(--faint);
+    }
+
+    /* ====================================================================
+       2. WORKSPACE CONTENT AREA (Right of sidebar)
+       ==================================================================== */
+    main#content {
+      flex: 1;
+      background: var(--bg);
+      padding: 24px 30px 24px 30px;
+      overflow-y: auto;
+      max-height: 100vh;
+    }
+
+    .page-view {
+      display: none;
+      flex-direction: column;
+      gap: 18px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .page-view.active {
+      display: flex;
+    }
+
+    /* Page Header */
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .page-title-group h2 {
+      font-size: 29px;
+      font-weight: 650;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .page-title-group p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Pills */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 11px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: #F2F5F3;
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+
+    .pill[tone="violet"] {
+      background: var(--violet-soft);
+      border-color: #D9D1E7;
+      color: var(--violet);
+    }
+
+    .pill[tone="green"] {
+      background: var(--green-soft);
+      border-color: #CDE4D3;
+      color: var(--green);
+    }
+
+    .pill[tone="amber"] {
+      background: var(--amber-soft);
+      border-color: #EBD9B5;
+      color: var(--amber);
+    }
+
+    .pill[tone="red"] {
+      background: var(--red-soft);
+      border-color: #EBCBC7;
+      color: var(--red);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Split layout on Translate Page: Left (3) : Right (2) */
+    .translate-grid {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 1100px) {
+      .translate-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Left Video Section */
+    .video-card {
+      display: flex;
+      flex-direction: column;
+    }
+
     .video-viewport {
-      position: relative;
       background: #000;
       aspect-ratio: 16 / 9;
       width: 100%;
-      overflow: hidden;
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
     }
 
     .video-viewport img {
@@ -269,1071 +375,2748 @@
       display: block;
     }
 
-    .camera-switcher-bar {
+    .video-controls {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 8px;
-      padding: 12px 16px;
-      background: rgba(11, 15, 25, 0.6);
-      border-top: 1px solid var(--card-border);
+      gap: 10px;
+      padding: 14px 16px;
+      background: #FFFFFF;
+      border-top: 1px solid var(--border);
     }
 
-    .preset-group {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
+    .fps-lbl {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--font-mono);
     }
 
-    .preset-btn {
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 0.78rem;
-      font-weight: 500;
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #FFFFFF;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      border: 1px solid var(--card-border);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text-muted);
+      color: var(--text);
       transition: all 0.15s ease;
     }
 
-    .preset-btn:hover {
-      background: var(--card-hover);
+    .icon-btn:hover {
+      background: var(--inset);
+      border-color: var(--border-strong);
+    }
+
+    .icon-btn.active {
+      background: var(--accent-soft);
+      border-color: #C9E1D9;
+      color: var(--accent);
+    }
+
+    .select-cam {
+      padding: 7px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #FFFFFF;
       color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      outline: none;
+      min-width: 210px;
+      cursor: pointer;
     }
 
-    .preset-btn.active {
-      background: rgba(34, 211, 238, 0.15);
-      border-color: var(--cyan);
-      color: var(--cyan);
-      box-shadow: 0 0 10px var(--cyan-glow);
+    .select-cam:focus {
+      border-color: var(--accent);
     }
 
-    /* Recognition HUD below stream */
-    .hud-metrics {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
+    .hint-row {
+      display: flex;
       align-items: center;
-      gap: 16px;
-      padding: 16px;
-      background: rgba(11, 15, 25, 0.4);
-      border-radius: 12px;
-      border: 1px solid var(--card-border);
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+      padding: 0 4px;
     }
 
-    .sign-badge {
-      width: 72px;
-      height: 72px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, rgba(34, 211, 238, 0.15), rgba(139, 92, 246, 0.15));
-      border: 2px solid var(--cyan);
+    /* Right Column Cards */
+    .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Detected Sign Card with SignDial */
+    .detected-card {
+      padding: 18px;
+    }
+
+    .detect-inner {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    /* SignDial SVG & Canvas */
+    .dial-wrap {
+      width: 170px;
+      height: 170px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .dial-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .dial-track {
+      fill: none;
+      stroke: #E0E6E2;
+      stroke-width: 9;
+    }
+
+    .dial-progress {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 9;
+      stroke-linecap: round;
+      transition: stroke 0.2s ease;
+    }
+
+    .dial-disc {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      bottom: 14px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 20px var(--cyan-glow);
-      transition: all 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+      overflow: hidden;
+      padding: 14px;
+      box-sizing: border-box;
     }
 
-    .sign-badge.stable {
-      border-color: var(--emerald);
-      box-shadow: 0 0 25px var(--emerald-glow);
+    .dial-char {
+      font-size: 60px;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1.05;
+      font-family: var(--font-sans);
+      max-width: 100%;
+      text-align: center;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
-    .sign-char {
-      font-size: 2.2rem;
-      font-weight: 800;
-      color: #FFF;
-      line-height: 1;
-      font-family: var(--font-mono);
-    }
-
-    .sign-sub {
-      font-size: 0.65rem;
+    .dial-caption {
+      font-size: 9px;
       font-weight: 600;
+      letter-spacing: 1.2px;
+      color: var(--faint);
+      margin-top: 4px;
       text-transform: uppercase;
-      color: var(--text-muted);
+    }
+
+    .dial-disc.flash {
+      background: #EAF4ED;
+      border-color: #CDE4D3;
+    }
+
+    .dial-disc.flash .dial-char {
+      color: var(--green);
+    }
+
+    .detect-info {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .detect-info h3 {
+      font-size: 17px;
+      font-weight: 650;
+      color: var(--text);
+    }
+
+    .detect-info p {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .conf-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
       margin-top: 4px;
     }
 
-    .meter-section {
+    .conf-bar-bg {
+      height: 7px;
+      background: #E0E6E2;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 2px;
+    }
+
+    .conf-bar-fill {
+      will-change: width;
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      border-radius: 4px;
+      transition: width 0.25s ease-out;
+    }
+
+    /* Current Word Card */
+    .word-card {
+      padding: 18px;
       display: flex;
       flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .word-field {
+      height: 48px;
+      background: var(--inset);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0 16px;
+      font-size: 22px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      letter-spacing: 2px;
+    }
+
+    .word-field:empty::before {
+      content: "Waiting…";
+      color: var(--faint);
+      font-weight: 400;
+      font-family: var(--font-sans);
+      font-size: 15px;
+      letter-spacing: normal;
+    }
+
+    .btn-group {
+      display: flex;
+      align-items: center;
       gap: 8px;
     }
 
-    .meter-label-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .progress-bar-bg {
-      height: 8px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 4px;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .progress-bar-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--cyan), var(--emerald));
-      border-radius: 4px;
-      transition: width 0.1s linear;
-    }
-
-    .hold-meter-bg {
-      height: 6px;
-      background: rgba(255, 255, 255, 0.06);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .hold-meter-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--emerald);
-      box-shadow: 0 0 8px var(--emerald);
-      transition: width 0.08s linear;
-    }
-
-    .predictions-box {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 140px;
-    }
-
-    .prediction-chip {
-      display: flex;
-      justify-content: space-between;
+    /* Buttons matching PySide6 Qt theme */
+    .btn {
+      display: inline-flex;
       align-items: center;
-      padding: 4px 8px;
-      background: rgba(255, 255, 255, 0.04);
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-family: var(--font-mono);
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
     }
 
-    /* Right Column: Transcription & Speech */
-    .transcription-column {
+    .btn:hover {
+      background: var(--inset);
+      border-color: var(--border-strong);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #FFFFFF;
+      border: 1px solid var(--accent);
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-dim);
+      border-color: var(--accent-dim);
+    }
+
+    .btn-ghost {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    /* Transcript Card */
+    .transcript-card {
+      padding: 18px;
       display: flex;
       flex-direction: column;
+      gap: 10px;
+    }
+
+    .transcript-area {
+      min-height: 120px;
+      max-height: 200px;
+      background: var(--inset);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: var(--text);
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    .transcript-area:empty::before {
+      content: "Your sentence will appear here…";
+      color: var(--faint);
+      font-style: italic;
+    }
+
+    .footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    /* Mini Toggles matching MiniToggle */
+    .toggle-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      background: var(--inset);
+      border: 1px solid var(--border);
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-chip.active {
+      background: var(--accent-soft);
+      border-color: #C9E1D9;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .shortcut-hint {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--faint);
+      padding: 0 4px;
+      margin-top: 4px;
+    }
+
+    /* ====================================================================
+       3. OTHER PAGES (Train, Guide, Settings)
+       ==================================================================== */
+    /* Guide Page */
+    .guide-card {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .guide-image-wrap {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #FFFFFF;
+      text-align: center;
+      padding: 10px;
+    }
+
+    .guide-image-wrap img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+
+    /* Settings Page */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 16px;
     }
 
-    .word-preview-box {
-      padding: 20px;
-      text-align: center;
-      background: linear-gradient(180deg, rgba(15, 23, 42, 0.8), rgba(11, 15, 25, 0.9));
-      border-bottom: 1px solid var(--card-border);
+    @media (max-width: 1000px) {
+      .settings-grid { grid-template-columns: 1fr; }
     }
 
-    .spelling-label {
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--cyan);
-      margin-bottom: 6px;
-      font-weight: 600;
-    }
-
-    .current-word {
-      font-size: 2.8rem;
-      font-weight: 800;
-      letter-spacing: 0.12em;
-      min-height: 54px;
-      font-family: var(--font-mono);
-      background: linear-gradient(90deg, #FFFFFF, var(--cyan));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      text-shadow: 0 0 24px var(--cyan-glow);
-    }
-
-    .current-word.empty {
-      color: var(--text-dim);
-      -webkit-text-fill-color: var(--text-dim);
-      font-size: 1.8rem;
-      font-style: italic;
-      font-weight: 400;
-    }
-
-    .transcript-box {
-      flex: 1;
-      min-height: 180px;
-      max-height: 280px;
-      overflow-y: auto;
-      padding: 16px;
-      font-size: 1.05rem;
-      line-height: 1.6;
-      color: #E2E8F0;
-      font-family: inherit;
-      white-space: pre-wrap;
-      word-break: break-word;
-      background: rgba(7, 10, 16, 0.6);
-    }
-
-    .transcript-box:empty::before {
-      content: "Recognized sentences will appear here. Start signing or type letters below...";
-      color: var(--text-dim);
-      font-style: italic;
-    }
-
-    .action-pad {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      padding: 14px;
-      background: rgba(11, 15, 25, 0.6);
-      border-top: 1px solid var(--card-border);
-    }
-
-    /* Virtual Keyboard */
-    .v-keyboard-section {
-      padding: 12px 14px;
-      background: rgba(11, 15, 25, 0.5);
-      border-top: 1px solid var(--card-border);
-    }
-
-    .v-keyboard-title {
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-dim);
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .v-keyboard-grid {
-      display: grid;
-      grid-template-columns: repeat(10, 1fr);
-      gap: 4px;
-    }
-
-    .v-key {
-      aspect-ratio: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--card-border);
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      font-family: var(--font-mono);
-      cursor: pointer;
-      color: var(--text);
-      transition: all 0.1s ease;
-    }
-
-    .v-key:hover {
-      background: rgba(34, 211, 238, 0.2);
-      border-color: var(--cyan);
-      color: var(--cyan);
-    }
-
-    .v-key:active {
-      transform: scale(0.92);
-    }
-
-    /* Speech & Audio Controls */
-    .speech-controls {
+    .setting-group {
+      padding: 18px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      padding: 16px;
+      gap: 14px;
     }
 
-    .control-row {
+    .setting-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .setting-row-h {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
     }
 
-    .control-label {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-    }
-
-    select, input[type="text"], input[type="range"] {
-      font-family: inherit;
-    }
-
-    select {
-      background: #0B0F19;
+    .setting-lbl {
+      font-size: 13px;
+      font-weight: 600;
       color: var(--text);
-      border: 1px solid var(--card-border);
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 0.82rem;
-      outline: none;
-      max-width: 220px;
     }
 
-    /* Modals & Dialogs */
-    .modal-overlay {
+    .setting-sub {
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+
+    input[type="text"], select {
+      height: 38px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #FFFFFF;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+    }
+
+    input[type="text"]:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    /* Toast Notification (matching Toast widget) */
+    .toast-box {
       position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(8px);
-      z-index: 1000;
+      bottom: 24px;
+      right: 24px;
+      background: #FFFFFF;
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      padding: 12px 18px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
       display: none;
       align-items: center;
-      justify-content: center;
-      padding: 20px;
+      gap: 10px;
+      z-index: 1000;
     }
-
-    .modal-overlay.open {
-      display: flex;
-    }
-
-    .modal-content {
-      background: #0B0F19;
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      width: 100%;
-      max-width: 780px;
-      max-height: 85vh;
-      overflow-y: auto;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .modal-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--card-border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .modal-body {
-      padding: 20px;
-      font-size: 0.9rem;
-      line-height: 1.6;
-      color: #CBD5E1;
-    }
-
-    .dict-grid {
+    /* ====================================================================
+       4. TRAIN PAGE STYLES (Matching PySide6 TrainPage)
+       ==================================================================== */
+    .train-top-row {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 12px;
-      margin-top: 14px;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 1050px) {
+      .train-top-row { grid-template-columns: 1fr; }
     }
 
-    .dict-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 10px 14px;
+    .train-bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .train-bottom-row { grid-template-columns: 1fr; }
+    }
+
+    .btn-danger {
+      background: #FFFFFF;
+      border: 1px solid var(--red-soft);
+      color: var(--red);
+      font-weight: 500;
+    }
+    .btn-danger:hover {
+      background: var(--red-soft);
+      border-color: var(--red);
+    }
+
+    .progress-bar-container {
+      height: 8px;
+      background: #E0E6E2;
+      border-radius: 4px;
+      overflow: hidden;
+      width: 100%;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.15s linear;
+      border-radius: 4px;
+    }
+
+    .train-grid-container {
+      display: grid;
+      grid-template-columns: repeat(13, 1fr);
+      gap: 6px;
+    }
+    @media (max-width: 1100px) {
+      .train-grid-container { grid-template-columns: repeat(9, 1fr); }
+    }
+    @media (max-width: 750px) {
+      .train-grid-container { grid-template-columns: repeat(6, 1fr); }
+    }
+
+    .letter-tile {
+      aspect-ratio: 1 / 1;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #FFFFFF;
       display: flex;
       flex-direction: column;
-      gap: 4px;
-    }
-
-    .dict-char {
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: var(--cyan);
-      font-family: var(--font-mono);
-    }
-
-    .dict-hint {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-    }
-
-    .guide-callout {
-      background: rgba(34, 211, 238, 0.08);
-      border-left: 3px solid var(--cyan);
-      padding: 12px 16px;
-      border-radius: 0 8px 8px 0;
-      margin: 14px 0;
-      font-size: 0.85rem;
-    }
-
-    .code-block {
-      background: #070A10;
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 12px;
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      color: var(--cyan);
-      overflow-x: auto;
-      margin: 10px 0;
-    }
-
-    /* Switch toggles */
-    .switch {
+      align-items: center;
+      justify-content: center;
       position: relative;
-      display: inline-block;
-      width: 40px;
-      height: 22px;
-    }
-
-    .switch input { opacity: 0; width: 0; height: 0; }
-
-    .slider {
-      position: absolute;
       cursor: pointer;
-      inset: 0;
-      background-color: rgba(255, 255, 255, 0.15);
-      transition: .2s;
-      border-radius: 22px;
+      user-select: none;
+      transition: all 0.12s ease;
+      padding: 3px;
+      min-width: 0;
     }
-
-    .slider:before {
+    .letter-tile:hover {
+      background: #F1F5F2;
+      border-color: var(--border-strong);
+    }
+    .letter-tile.active {
+      background: rgba(30, 107, 79, 0.08);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+    .tile-label {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      text-align: center;
+    }
+    .letter-tile.active .tile-label {
+      color: var(--accent);
+    }
+    .tile-count {
+      font-size: 8px;
+      font-weight: 600;
+      color: var(--faint);
+      margin-top: 2px;
+      font-family: var(--font-mono);
+    }
+    .tile-count.green {
+      color: var(--green);
+    }
+    .tile-bar-bg {
       position: absolute;
-      content: "";
-      height: 16px;
-      width: 16px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: .2s;
-      border-radius: 50%;
+      bottom: 4px;
+      left: 6px;
+      right: 6px;
+      height: 2px;
+      border-radius: 1px;
+      background: transparent;
+      overflow: hidden;
     }
-
-    input:checked + .slider { background-color: var(--cyan); }
-    input:checked + .slider:before { transform: translateX(18px); }
-
-    /* Custom scrollbar */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+    .tile-bar-fill {
+      height: 100%;
+      border-radius: 1px;
+      background: var(--accent);
+    }
+    .tile-bar-fill.green {
+      background: var(--green);
+    }
   </style>
 </head>
 <body>
 
-  <!-- Top Navigation Bar -->
-  <header>
-    <a href="/" class="brand">
-      <div class="brand-icon">🤟</div>
-      <div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="brand-title">SignSpeak</span>
-          <span class="brand-badge">5G MEC EDGE</span>
-        </div>
-        <div style="font-size: 0.7rem; color: var(--text-dim);">ASL & Gesture to Speech System</div>
-      </div>
-    </a>
-
-    <div class="header-status">
-      <div class="status-pill">
-        <div id="connDot" class="pulse-dot"></div>
-        <span id="connStatus">Camera Live</span>
-      </div>
-      <div class="status-pill" id="fpsDisplay">-- FPS</div>
-      <div class="status-pill" id="modelDisplay">Model: Extra Trees (99.4%)</div>
-    </div>
-
-    <div class="nav-actions">
-      <button class="btn btn-sm" onclick="togglePause()" id="pauseBtn">⏸ Pause</button>
-      <button class="btn btn-sm" onclick="openModal('guideModal')">📘 Sign Guide</button>
-      <button class="btn btn-sm" onclick="openModal('netModal')">🌐 5G Lab Setup</button>
-      <button class="btn btn-sm" onclick="openModal('settingsModal')">⚙️ Settings</button>
-    </div>
-  </header>
-
-  <!-- Main Grid -->
-  <main>
-    <!-- Left Column: Video & Recognition HUD -->
-    <div class="stream-column">
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <span>📹 Live Video Feed</span>
-            <span style="font-size: 0.72rem; color: var(--text-dim);" id="streamResBadge">1280x720</span>
-          </div>
-          <div style="display: flex; gap: 6px;">
-            <button class="btn btn-sm" onclick="takeSnapshot()">📸 Snapshot</button>
-            <button class="btn btn-sm" onclick="toggleFullscreen()">⛶ Fullscreen</button>
-          </div>
-        </div>
-
-        <div class="video-viewport" id="videoContainer">
-          <img id="liveFeed" src="/video_feed" alt="Camera Stream" onerror="handleStreamError()">
-        </div>
-
-        <!-- Camera Switcher Presets -->
-        <div class="camera-switcher-bar">
-          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">SOURCE:</span>
-          <div class="preset-group">
-            <button class="preset-btn active" id="btnPreset5G" onclick="switchCameraPreset('5g')">⚡ 5G Modem (10.101.0.70)</button>
-            <button class="preset-btn" id="btnPresetEth" onclick="switchCameraPreset('ethernet')">🔌 Direct Ethernet (192.168.128.10)</button>
-            <button class="preset-btn" id="btnPresetWebcam" onclick="switchCameraPreset('webcam')">💻 Webcam 0</button>
-            <button class="preset-btn" onclick="openCustomCamPrompt()">✏️ Custom...</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Live Detection Metrics HUD -->
-      <div class="hud-metrics">
-        <!-- Big Sign Character Badge -->
-        <div class="sign-badge" id="signBadge">
-          <div class="sign-char" id="signChar">—</div>
-          <div class="sign-sub" id="signSub">NONE</div>
-        </div>
-
-        <!-- Meters: Confidence & Hold Progress -->
-        <div class="meter-section">
-          <div>
-            <div class="meter-label-row">
-              <span>Confidence</span>
-              <span id="confValue" style="color: var(--cyan); font-weight: 600;">0%</span>
-            </div>
-            <div class="progress-bar-bg">
-              <div class="progress-bar-fill" id="confBar"></div>
-            </div>
-          </div>
-          <div>
-            <div class="meter-label-row">
-              <span>Hold-to-Type Progress</span>
-              <span id="holdValue" style="color: var(--emerald); font-weight: 600;">0%</span>
-            </div>
-            <div class="hold-meter-bg">
-              <div class="hold-meter-fill" id="holdBar"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Top Alternative Predictions -->
-        <div class="predictions-box" id="topPredictionsBox">
-          <div class="prediction-chip"><span>—</span><span>0%</span></div>
-          <div class="prediction-chip"><span>—</span><span>0%</span></div>
-          <div class="prediction-chip"><span>—</span><span>0%</span></div>
-        </div>
+  <!-- ==================================================================
+       LEFT SIDEBAR (MainWindow QFrame#Sidebar)
+       ================================================================== -->
+  <aside id="sidebar">
+    <!-- Brand -->
+    <div class="brand-row">
+      <div class="logomark">✋</div>
+      <div class="brand-text">
+        <h1>SignSpeak</h1>
+        <p>Sign Language · Speech</p>
       </div>
     </div>
 
-    <!-- Right Column: Transcription & Speech -->
-    <div class="transcription-column">
-      <div class="card" style="flex: 1;">
-        <div class="card-header">
-          <div class="card-title">
-            <span>💬 Live Transcription</span>
+    <!-- Workspace Navigation -->
+    <div class="section-title">WORKSPACE</div>
+    <div class="nav-list">
+      <button class="nav-btn active" id="navTranslate" onclick="setPage('translate')">
+        <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+        <span>Translate</span>
+      </button>
+      <button class="nav-btn" id="navTrain" onclick="setPage('train')">
+        <svg viewBox="0 0 24 24"><path d="m15 4-2 4 4 2-2 4M2 20h20M6 20V9a3 3 0 0 1 3-3h1"/></svg>
+        <span>Train</span>
+      </button>
+      <button class="nav-btn" id="navGuide" onclick="setPage('guide')">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>
+        <span>Guide</span>
+      </button>
+      <button class="nav-btn" id="navSettings" onclick="setPage('settings')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </button>
+    </div>
+
+    <!-- Status Inset Card -->
+    <div class="section-title">STATUS</div>
+    <div class="inset-card">
+      <div class="status-row">
+        <span class="lbl">Model</span>
+        <span class="val" id="sideModel">Personal</span>
+      </div>
+      <div class="status-row">
+        <span class="lbl">Camera</span>
+        <span class="val green" id="sideCamera">Live</span>
+      </div>
+      <div class="status-row">
+        <span class="lbl">Speech</span>
+        <span class="val" id="sideSpeech">Ready</span>
+      </div>
+    </div>
+
+    <!-- Tip Inset Card -->
+    <div class="tip-card">
+      <h4>Personalize your signs</h4>
+      <p>Teach a personal model the handshapes you use most.</p>
+      <button class="tip-btn" onclick="setPage('train')">✨ Train a model</button>
+    </div>
+
+    <!-- Footer -->
+    <div class="sidebar-footer">
+      <span>● All processing stays on this device</span>
+      <span>v1.0 · MediaPipe + Web UI</span>
+    </div>
+  </aside>
+
+  <!-- ==================================================================
+       WORKSPACE MAIN CONTENT AREA (QStackedWidget)
+       ================================================================== -->
+  <main id="content">
+
+    <!-- PAGE 1: TRANSLATE PAGE (Exact match to TranslatePage) -->
+    <div class="page-view active" id="pageTranslate">
+      <!-- Header -->
+      <div class="page-header">
+        <div class="page-title-group">
+          <h2>Live translate</h2>
+          <p>Sign naturally. Your handshapes become text, ready to edit or speak.</p>
+        </div>
+        <div class="header-actions">
+          <div class="pill" tone="violet" id="headerModelPill">Personal model · 99.4%</div>
+          <div class="pill" tone="green" id="headerCameraPill">LIVE · 172.16.0.11</div>
+        </div>
+      </div>
+
+      <!-- Content Grid: Left (Video) & Right (Recognition) -->
+      <div class="translate-grid">
+        <!-- Left: Video Card -->
+        <div class="video-card">
+          <div class="card">
+            <div class="video-viewport" id="videoBox">
+              <img id="cameraStream" src="/video_feed" alt="Live Camera" onerror="retryStream()">
+            </div>
+            <div class="video-controls">
+              <span class="pill" tone="green" id="liveStatusPill">LIVE</span>
+              <span class="fps-lbl" id="fpsLabel">29.5 FPS</span>
+              <button class="btn btn-ghost" id="retryBtn" style="display: none;" onclick="retryStream()">🔄 Retry camera</button>
+              <div style="flex: 1;"></div>
+              <button class="icon-btn active" id="mirrorBtn" title="Mirror the preview" onclick="toggleMirror()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h3m8-18h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3M12 2v20"/></svg>
+              </button>
+              <button class="icon-btn" id="pauseBtn" title="Pause camera" onclick="togglePause()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              </button>
+              <select class="select-cam" id="cameraSelect" onchange="onCameraSelect(this.value)">
+                <option value="laptop" selected>💻 Laptop Webcam (0)</option>
+                <option value="ethernet">🔌 Direct Ethernet (192.168.128.10:554)</option>
+                <option value="5g" id="opt5g">📶 5G Modem (10.101.0.74:554)</option>
+              </select>
+              <div id="group5GIp" style="display: inline-flex; align-items: center; gap: 4px;">
+                <input type="text" id="quick5GIp" value="10.101.0.74" placeholder="10.101.0.74" title="Enter dynamic 5G Modem WAN IP" style="width: 108px; height: 32px; font-size: 12px; font-family: var(--font-mono); border: 1px solid var(--border); border-radius: 7px; padding: 0 7px; background: var(--surface); color: var(--text);" onkeydown="if(event.key==='Enter') applyQuick5GIp()">
+                <button class="btn btn-ghost" style="height: 32px; padding: 0 8px; font-size: 11.5px; white-space: nowrap;" onclick="applyQuick5GIp()" title="Connect to this 5G RTSP stream">Set 5G IP</button>
+              </div>
+            </div>
           </div>
-          <div style="display: flex; gap: 6px;">
-            <button class="btn btn-sm btn-emerald" onclick="speakCurrentText()">🔊 Speak Now</button>
-            <button class="btn btn-sm" onclick="copyTranscript()">📋 Copy</button>
-            <button class="btn btn-sm btn-coral" onclick="clearTranscript()">🗑 Clear</button>
+          <div class="hint-row">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>Keep your hand in frame and change signs directly—no need to move out of view. Thumbs up finishes a word · Period sign finishes a sentence.</span>
           </div>
         </div>
 
-        <!-- Word Being Spelled (Huge animated letters) -->
-        <div class="word-preview-box">
-          <div class="spelling-label">Active Word Buffer</div>
-          <div class="current-word empty" id="activeWordDisplay">[waiting for sign]</div>
+        <!-- Right: Recognition Cards -->
+        <div class="right-column">
+          <!-- Card 1: Detected Sign (with SignDial) -->
+          <div class="card detected-card">
+            <div class="detect-inner">
+              <!-- Circular SignDial -->
+              <div class="dial-wrap">
+                <svg class="dial-svg" viewBox="0 0 200 200">
+                  <circle class="dial-track" cx="100" cy="100" r="88"/>
+                  <circle class="dial-progress" id="dialRing" cx="100" cy="100" r="88" stroke-dasharray="552.92" stroke-dashoffset="552.92"/>
+                </svg>
+                <div class="dial-disc" id="dialDisc">
+                  <span class="dial-char" id="dialChar">—</span>
+                  <span class="dial-caption" id="dialCaption">SHOW YOUR HAND</span>
+                </div>
+              </div>
+
+              <!-- Detected Sign Details -->
+              <div class="detect-info">
+                <div class="section-title">DETECTED SIGN</div>
+                <h3 id="detectTitle">Starting camera…</h3>
+                <p id="detectHint">Center your hand in the frame.</p>
+                <div class="conf-row">
+                  <span style="color: var(--muted); font-size: 11.5px;">Model signal</span>
+                  <span style="color: var(--accent); font-weight: 700; font-family: var(--font-mono);" id="confPct">—</span>
+                </div>
+                <div class="conf-bar-bg">
+                  <div class="conf-bar-fill" id="confBar"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Current Word -->
+          <div class="card word-card">
+            <div class="card-header-row">
+              <span class="section-title">CURRENT WORD</span>
+              <span style="font-size: 11.5px; color: var(--muted);" id="letterCount">0 letters</span>
+            </div>
+            <div class="word-field" id="wordField"></div>
+            <div class="card-header-row">
+              <div class="btn-group">
+                <button class="btn btn-ghost" onclick="sendAction('backspace')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+                  <span>Backspace</span>
+                </button>
+                <button class="btn btn-ghost" onclick="sendAction('space')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                  <span>Finish word</span>
+                </button>
+                <button class="btn btn-ghost" onclick="sendAction('clear_word')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  <span>Clear</span>
+                </button>
+              </div>
+              <button class="btn btn-primary" onclick="sendAction('commit_now')" title="Type the sign you are currently holding (Enter)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M18 12h.01M8 16h8"/></svg>
+                <span>Type sign</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 3: Transcript -->
+          <div class="card transcript-card">
+            <div class="card-header-row">
+              <span class="section-title">TRANSCRIPT</span>
+              <div class="btn-group">
+                <button class="btn btn-ghost" style="padding: 4px 8px; font-size: 11.5px;" onclick="sendAction('delete_word')">Delete word</button>
+                <button class="icon-btn" style="width: 30px; height: 30px;" title="Copy transcript" onclick="copyTranscript()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+                <button class="icon-btn" style="width: 30px; height: 30px;" title="Clear transcript (Ctrl+R)" onclick="sendAction('clear_all')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="transcript-area" id="transcriptArea"></div>
+            <div class="footer-row">
+              <button class="btn btn-primary" onclick="speakCurrentSentence()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                <span>Speak sentence</span>
+              </button>
+              <div class="btn-group">
+                <div class="toggle-chip active" id="chipWords" onclick="toggleChip('chipWords')">Words</div>
+                <div class="toggle-chip active" id="chipSentences" onclick="toggleChip('chipSentences')">Sentences</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shortcuts Row -->
+          <div class="shortcut-hint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M18 12h.01M8 16h8"/></svg>
+            <span>Enter · type sign &nbsp;&nbsp; Backspace · undo &nbsp;&nbsp; Ctrl+Backspace · delete word &nbsp;&nbsp; Esc · pause &nbsp;&nbsp; Ctrl+R · reset</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 2: TRAIN PAGE (Matching TrainPage) -->
+    <div class="page-view" id="pageTrain">
+      <div class="page-header">
+        <div class="page-title-group">
+          <h2>Train your model</h2>
+          <p>Build a recognizer around your hands. Record separate takes with small changes in position and distance.</p>
+        </div>
+        <div class="header-actions">
+          <span class="pill" id="trainHeaderPill" tone="green">PERSONAL MODEL</span>
+          <button class="btn btn-primary" id="btnTrainHeader" onclick="requestTraining()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 4V2m0 16v-2m8-8h-2M4 10H2m17.07-5.07l-1.41 1.41M6.34 17.66l-1.41 1.41m14.14 0l-1.41-1.41M6.34 6.34L4.93 4.93M14 10a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            Train model
+          </button>
+        </div>
+      </div>
+
+      <!-- Top Row: Preview + Record Card -->
+      <div class="train-top-row">
+        <!-- Preview Card -->
+        <div class="card video-card" style="padding: 16px; gap: 10px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span class="section-title">CAMERA PREVIEW</span>
+            <span class="pill" id="trainPreviewPill" tone="green">LIVE</span>
+          </div>
+          <div class="video-viewport" style="border-radius: 9px; min-height: 240px;">
+            <img id="trainCameraStream" src="/video_feed" alt="Train Preview Stream" onerror="this.style.display='none'; document.getElementById('trainStreamFallback').style.display='flex';" onload="this.style.display='block'; document.getElementById('trainStreamFallback').style.display='none';">
+            <div id="trainStreamFallback" style="display: none; flex-direction: column; align-items: center; justify-content: center; color: var(--faint); gap: 6px;">
+              <span style="font-size: 14px; font-weight: 600;">Camera offline</span>
+              <span style="font-size: 11px;">Check camera connection in Settings</span>
+            </div>
+          </div>
+          <div class="hint-row" style="margin-top: 0;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>Keep both hands visible for two-hand signs. Use even light, and vary hand position slightly between takes.</span>
+          </div>
         </div>
 
-        <!-- Full Spoken Transcript -->
-        <div class="transcript-box" id="transcriptDisplay"></div>
+        <!-- Record a Sign Card -->
+        <div class="card" style="padding: 18px; gap: 12px;">
+          <span class="section-title">RECORD A SIGN</span>
 
-        <!-- Action Pad (Quick Gestures / Buttons) -->
-        <div class="action-pad">
-          <button class="btn" onclick="sendAction('space')">␣ Space (👍)</button>
-          <button class="btn" onclick="sendAction('period')">. Period (🤟)</button>
-          <button class="btn btn-coral" onclick="sendAction('backspace')">⌫ Backspace (✋)</button>
-          <button class="btn btn-primary" onclick="sendAction('commit_now')">⚡ Commit Now</button>
+          <!-- Selected sign banner -->
+          <div style="display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: var(--inset); border-radius: 9px; border: 1px solid var(--border);">
+            <div id="selectedTrainLabelBig" style="font-size: 44px; font-weight: 800; color: var(--accent); line-height: 1; min-width: 50px; text-align: center;">A</div>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <div id="selectedTrainName" style="font-size: 17px; font-weight: 700; color: var(--text);">Sign A</div>
+              <div id="selectedTrainCounts" style="font-size: 11.5px; color: var(--muted); font-family: var(--font-mono);">0 samples · 0 takes · target 30</div>
+            </div>
+          </div>
+
+          <!-- Sign hint -->
+          <div id="selectedTrainHint" style="font-size: 12px; color: var(--muted); line-height: 1.4; min-height: 34px;">
+            Fist with thumb resting along the side of index finger
+          </div>
+
+          <!-- Capture Length & Delay controls -->
+          <div style="display: flex; gap: 10px;">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 11px; font-weight: 600; color: var(--muted);">Capture length</span>
+              <select id="trainDurationSelect">
+                <option value="2.0">2 sec</option>
+                <option value="3.0" selected>3 sec</option>
+                <option value="4.0">4 sec</option>
+              </select>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 11px; font-weight: 600; color: var(--muted);">Start delay</span>
+              <select id="trainDelaySelect">
+                <option value="0.0">Off</option>
+                <option value="2.0">2 sec</option>
+                <option value="3.0" selected>3 sec</option>
+                <option value="5.0">5 sec</option>
+                <option value="8.0">8 sec</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Record / Cancel buttons -->
+          <div style="display: flex; gap: 8px; margin-top: 2px;">
+            <button class="btn btn-primary" id="btnRecordSign" style="flex: 1; min-height: 40px;" onclick="startSignRecording()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+              <span id="btnRecordSignText">Record sign</span>
+            </button>
+            <button class="btn btn-ghost" id="btnCancelRecord" style="display: none; min-height: 40px;" onclick="cancelSignRecording()">
+              Cancel
+            </button>
+          </div>
+
+          <!-- Progress Bar -->
+          <div id="recordProgressWrap" style="display: none; flex-direction: column; gap: 4px;">
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" id="recordProgressBar" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- Status text -->
+          <div id="recordStatusText" style="font-size: 11.5px; color: var(--muted); line-height: 1.4;">
+            Record multiple separate takes for each sign. Vary position between takes.
+          </div>
+
+          <!-- Clear / Remove buttons -->
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 6px; border-top: 1px solid var(--border);">
+            <button class="btn btn-ghost" style="font-size: 11.5px; padding: 6px 10px;" onclick="clearCurrentSign()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Clear this sign
+            </button>
+            <button class="btn btn-danger" id="btnRemoveWord" style="display: none; font-size: 11.5px; padding: 6px 10px;" onclick="removeCurrentCustomWord()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Remove custom word
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dataset Card -->
+      <div class="card" style="padding: 18px; gap: 14px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="section-title">YOUR DATASET</span>
+            <span id="datasetSummaryCount" style="font-size: 12px; color: var(--muted); font-family: var(--font-mono);">0 samples · 0 signs</span>
+          </div>
+          <button class="btn btn-danger" style="font-size: 12px; padding: 6px 12px;" onclick="confirmClearDataset()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Clear all data
+          </button>
         </div>
 
-        <!-- Virtual ASL Keyboard (A-Z, 0-9) -->
-        <div class="v-keyboard-section">
-          <div class="v-keyboard-title">
-            <span>Manual Sign / Letter Assist</span>
-            <span>Click letter to inject</span>
+        <!-- Custom word row -->
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="customWordInput" placeholder="Add a custom word or short phrase" maxlength="32" style="flex: 1;" onkeydown="if(event.key==='Enter') addCustomWordFromInput()">
+          <button class="btn btn-ghost" id="btnVoiceCustomWord" onclick="toggleVoiceForCustomWord()">
+            🎤 Record phrase
+          </button>
+          <button class="btn btn-ghost" onclick="addCustomWordFromInput()">Add word</button>
+        </div>
+
+        <!-- Letters Grid (13 columns) -->
+        <div class="train-grid-container" id="tilesGrid">
+          <!-- Dynamically populated -->
+        </div>
+
+        <div style="font-size: 11.5px; color: var(--faint);">
+          Aim for 30+ samples from at least 3 separate takes per sign.
+        </div>
+      </div>
+
+      <!-- Bottom Row: Train Model & Model in Use -->
+      <div class="train-bottom-row">
+        <!-- Train Model Card -->
+        <div class="card" style="padding: 18px; gap: 12px;">
+          <span class="section-title">TRAIN MODEL</span>
+          <p style="font-size: 12px; color: var(--muted); line-height: 1.5;">
+            SignSpeak compares SVM, Extra Trees, Random Forest and K-NN. With multiple takes per sign, it validates on held-out takes before saving the best model.
+          </p>
+          <button class="btn btn-primary" id="btnTrainPersonal" style="min-height: 40px; font-weight: 600;" onclick="requestTraining()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 4V2m0 16v-2m8-8h-2M4 10H2m17.07-5.07l-1.41 1.41M6.34 17.66l-1.41 1.41m14.14 0l-1.41-1.41M6.34 6.34L4.93 4.93M14 10a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            Train personal model
+          </button>
+          <div id="trainProgressWrap" style="display: none; flex-direction: column; gap: 4px;">
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" id="trainProgressBar" style="width: 0%;"></div>
+            </div>
           </div>
-          <div class="v-keyboard-grid" id="virtualKeyboard">
-            <!-- Populated via JS -->
+          <div id="trainStatusText" style="font-size: 12px; color: var(--muted); line-height: 1.4;">
+            Record at least two signs (5+ samples each) to start training.
           </div>
         </div>
 
-        <!-- Browser Speech Synthesis Controls -->
-        <div class="speech-controls">
-          <div class="control-row">
-            <span class="control-label">Speech Voice (Web Speech API):</span>
-            <select id="voiceSelect" onchange="updateVoice()"></select>
+        <!-- Model in Use Card -->
+        <div class="card" style="padding: 18px; gap: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span class="section-title">MODEL IN USE</span>
+            <span class="pill" id="cardModelPill" tone="green">PERSONAL</span>
           </div>
-          <div class="control-row">
-            <span class="control-label">Auto-speak word on Space (thumbs-up):</span>
-            <label class="switch">
-              <input type="checkbox" id="autoWordCheck" checked>
-              <span class="slider"></span>
+          <div id="cardModelName" style="font-size: 18px; font-weight: 700; color: var(--text);">Your personal model</div>
+          <div id="cardModelDetail" style="font-size: 12px; color: var(--muted);">Personal sign recognition</div>
+          <div id="cardModelAccuracy" style="font-size: 22px; font-weight: 800; color: var(--green);">Loading model status…</div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-primary" id="btnPersonalModelActive" style="flex: 1;" disabled>
+              Personal model active
+            </button>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <a href="/api/model/download" class="btn btn-ghost" style="flex: 1; text-decoration: none; font-size: 12px;">
+              Save a copy…
+            </a>
+            <button class="btn btn-ghost" style="flex: 1; font-size: 12px;" onclick="document.getElementById('modelFileInput').click()">
+              Load saved model…
+            </button>
+            <input type="file" id="modelFileInput" accept=".joblib,.pkl" style="display: none;" onchange="uploadModelFile(this)">
+          </div>
+
+          <div style="font-size: 11.5px; color: var(--faint); line-height: 1.4;">
+            Personal models adapt to the examples you record. Keep a saved copy before retraining if you want to return to an earlier version.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 3: GUIDE PAGE (Matching GuidePage with ASL Chart) -->
+    <div class="page-view" id="pageGuide">
+      <div class="page-header">
+        <div class="page-title-group">
+          <h2>Sign reference</h2>
+          <p>A quick visual guide to the ASL alphabet and numbers.</p>
+        </div>
+      </div>
+
+      <div class="card guide-card">
+        <div class="guide-image-wrap">
+          <img src="/assets/asl_alphabet.png" alt="ASL Alphabet Reference" onerror="this.alt='ASL Alphabet Chart Image';">
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 4: SETTINGS PAGE (Matching SettingsPage) -->
+    <div class="page-view" id="pageSettings">
+      <div class="page-header">
+        <div class="page-title-group">
+          <h2>Settings</h2>
+          <p>Set up your camera, recognition pace and speech preferences.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost" onclick="resetDefaultSettings()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Reset defaults
+          </button>
+          <button class="btn btn-primary" onclick="saveSettings()">Save changes</button>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <!-- 1. Camera Settings -->
+        <div class="card setting-group">
+          <span class="section-title">CAMERA MODES (3 OPTIONS)</span>
+          <div class="setting-row">
+            <span class="setting-lbl">Active Camera Mode:</span>
+            <select id="cfgCamMode" onchange="onSettingCamModeChange(this.value)">
+              <option value="laptop">💻 Mode 1: Laptop Webcam (0)</option>
+              <option value="ethernet">🔌 Mode 2: Direct Ethernet (192.168.128.10:554)</option>
+              <option value="5g">📶 Mode 3: 5G Modem Camera (Dynamic IP)</option>
+            </select>
+          </div>
+          <div class="setting-row" id="row5GIp">
+            <span class="setting-lbl">5G Camera IP Address (Dynamic WAN):</span>
+            <input type="text" id="cfg5GIp" placeholder="10.101.0.74" style="font-family: var(--font-mono);">
+            <span class="setting-sub">Modem assigns dynamic WAN IP on reconnect (currently 10.101.0.74). Automatically updates .env.</span>
+          </div>
+          <div class="setting-row">
+            <span class="setting-lbl">Inference Width:</span>
+            <span class="setting-sub">640 px balances speed and detail. 800–960 px for smaller hands.</span>
+            <select id="cfgInferenceWidth">
+              <option value="480">480 px (Fastest)</option>
+              <option value="640">640 px (Balanced)</option>
+              <option value="800" selected>800 px (Recommended for Edge)</option>
+              <option value="960">960 px (High Detail)</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <span class="setting-lbl">Mirror Preview:</span>
+            <span class="setting-sub">Flip the camera display horizontally so signs feel natural.</span>
+            <label style="display: flex; align-items: center; gap: 8px; margin-top: 4px; cursor: pointer;">
+              <input type="checkbox" id="cfgMirror" checked>
+              <span style="font-size: 13px;">Enable mirror preview</span>
             </label>
           </div>
-          <div class="control-row">
-            <span class="control-label">Auto-speak sentence on Period (ILY sign):</span>
-            <label class="switch">
-              <input type="checkbox" id="autoSentenceCheck" checked>
-              <span class="slider"></span>
+          <div class="inset-card">
+            <span class="section-title">3 CAMERA MODES REFERENCE</span>
+            <div class="status-row">
+              <span>Mode 1 (Laptop Webcam):</span>
+              <span class="val">Device Index 0 (Local USB/Built-in)</span>
+            </div>
+            <div class="status-row">
+              <span>Mode 2 (Direct Ethernet):</span>
+              <span class="val"><a href="http://192.168.128.10:8080" target="_blank" style="color: var(--accent); text-decoration: none;">192.168.128.10:8080 (Web Login)</a></span>
+            </div>
+            <div class="status-row">
+              <span>Mode 3 (5G Modem WAN):</span>
+              <span class="val" id="lbl5GHostQuick">10.101.0.73 (Dynamic RTSP :554)</span>
+            </div>
+            <div class="status-row">
+              <span>Modem Direct Ethernet IP:</span>
+              <span class="val"><a href="http://192.168.128.1" target="_blank" style="color: var(--accent); text-decoration: none;">192.168.128.1</a></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Recognition Pace -->
+        <div class="card setting-group">
+          <span class="section-title">RECOGNITION</span>
+          <div class="setting-row">
+            <div class="setting-row-h">
+              <span class="setting-lbl">Hold to type:</span>
+              <span class="val" id="valHold" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">500 ms</span>
+            </div>
+            <input type="range" id="cfgHold" min="150" max="2000" step="50" value="500" oninput="document.getElementById('valHold').textContent = this.value + ' ms'">
+            <span class="setting-sub">How long a sign must stay stable before it is typed.</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-h">
+              <span class="setting-lbl">Smoothing window:</span>
+              <span class="val" id="valSmoothing" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">8 frames</span>
+            </div>
+            <input type="range" id="cfgSmoothing" min="4" max="30" step="1" value="8" oninput="document.getElementById('valSmoothing').textContent = this.value + ' frames'">
+            <span class="setting-sub">More frames = steadier but slightly slower.</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-h">
+              <span class="setting-lbl">Vote agreement:</span>
+              <span class="val" id="valVoteRatio" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">60%</span>
+            </div>
+            <input type="range" id="cfgVoteRatio" min="35" max="90" step="5" value="60" oninput="document.getElementById('valVoteRatio').textContent = this.value + '%'">
+            <span class="setting-sub">Share of recent frames that must agree.</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-h">
+              <span class="setting-lbl">Confidence cutoff:</span>
+              <span class="val" id="valConf" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">0.55</span>
+            </div>
+            <input type="range" id="cfgConf" min="0.20" max="0.90" step="0.05" value="0.55" oninput="document.getElementById('valConf').textContent = this.value">
+            <span class="setting-sub">Signal confidence required to recognize hand shape.</span>
+          </div>
+        </div>
+
+        <!-- 3. Speech & Audio (Sarvam AI & Indian Languages) -->
+        <div class="card setting-group">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span class="section-title">SPEECH & AUDIO</span>
+            <span class="pill" id="sarvamKeyPill" tone="green">SARVAM ACTIVE</span>
+          </div>
+          <div class="setting-row">
+            <span class="setting-lbl">Speech Engine Provider:</span>
+            <select id="cfgTTSProvider" onchange="onTTSProviderChange()">
+              <option value="sarvam" selected>Auto: English → Microsoft, Indian languages → Sarvam</option>
+              <option value="local">Microsoft voice only</option>
+            </select>
+          </div>
+          <div class="setting-row" id="rowSarvamLang">
+            <span class="setting-lbl">Speech Language:</span>
+            <select id="cfgSarvamLang" onchange="onSarvamLangChange()">
+              <option value="en-IN" selected>English · Microsoft voice</option>
+              <option value="hi-IN">Hindi (hi-IN) · Sarvam</option>
+              <option value="bn-IN">Bengali (bn-IN) · Sarvam</option>
+              <option value="gu-IN">Gujarati (gu-IN) · Sarvam</option>
+              <option value="kn-IN">Kannada (kn-IN) · Sarvam</option>
+              <option value="ml-IN">Malayalam (ml-IN) · Sarvam</option>
+              <option value="mr-IN">Marathi (mr-IN) · Sarvam</option>
+              <option value="od-IN">Odia (od-IN) · Sarvam</option>
+              <option value="pa-IN">Punjabi (pa-IN) · Sarvam</option>
+              <option value="ta-IN">Tamil (ta-IN) · Sarvam</option>
+              <option value="te-IN">Telugu (te-IN) · Sarvam</option>
+            </select>
+          </div>
+          <div class="setting-row" id="rowLocalVoice">
+            <span class="setting-lbl">English (Microsoft) Voice:</span>
+            <select id="voiceDropdown" onchange="changeVoice()"></select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-h">
+              <span class="setting-lbl">Speaking rate:</span>
+              <span class="val" id="valRate" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">Normal</span>
+            </div>
+            <input type="range" id="cfgRate" min="-10" max="10" step="1" value="0" oninput="updateRateLabel(this.value)">
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-h">
+              <span class="setting-lbl">Volume:</span>
+              <span class="val" id="valVolume" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">100%</span>
+            </div>
+            <input type="range" id="cfgVolume" min="0" max="100" step="5" value="100" oninput="document.getElementById('valVolume').textContent = this.value + '%'">
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 4px;">
+            <button class="btn btn-ghost" onclick="testVoice()">🔊 Test voice</button>
+          </div>
+          <div class="inset-card" style="margin-top: 6px;">
+            <span class="section-title">SPEECH AUTOMATION</span>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="cfgAutoWord" checked>
+              <span style="font-size: 12.5px;">Speak words (when finishing with space sign)</span>
             </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="cfgAutoSentence" checked>
+              <span style="font-size: 12.5px;">Speak sentences (when ending with full stop)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="cfgSpeakLetters">
+              <span style="font-size: 12.5px;">Speak letters (pronounce each letter as typed)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 4. Advanced Timing & Display -->
+        <div class="card setting-group">
+          <span class="section-title">ADVANCED & DISPLAY</span>
+          <div class="setting-row">
+            <div class="setting-row-h">
+              <span class="setting-lbl">Minimum gap (Cooldown):</span>
+              <span class="val" id="valCooldown" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">200 ms</span>
+            </div>
+            <input type="range" id="cfgCooldown" min="100" max="2000" step="50" value="200" oninput="document.getElementById('valCooldown').textContent = this.value + ' ms'">
+            <span class="setting-sub">Safety delay between two typed signs.</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-h">
+              <span class="setting-lbl">Release time:</span>
+              <span class="val" id="valRelease" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">250 ms</span>
+            </div>
+            <input type="range" id="cfgRelease" min="100" max="1000" step="50" value="250" oninput="document.getElementById('valRelease').textContent = this.value + ' ms'">
+            <span class="setting-sub">Time without a stable sign before it can repeat.</span>
+          </div>
+          <div class="inset-card" style="margin-top: 6px;">
+            <span class="section-title">DISPLAY OVERLAYS</span>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="cfgDrawOverlay" checked>
+              <span style="font-size: 12.5px;">Draw hand skeleton & HUD overlay</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="cfgShowFps" checked>
+              <span style="font-size: 12.5px;">Show live FPS counter</span>
+            </label>
+          </div>
+          <div class="inset-card" style="margin-top: 6px;">
+            <span class="section-title">SARVAM INTEGRATION STATUS</span>
+            <div class="status-row">
+              <span>Text-to-Speech:</span>
+              <span class="val green">Sarvam Bulbul v3</span>
+            </div>
+            <div class="status-row">
+              <span>Speech-to-Text:</span>
+              <span class="val green">Sarvam Saaras v3</span>
+            </div>
+            <div class="status-row">
+              <span>API Key:</span>
+              <span class="val green">sk_5on72... (Active)</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
   </main>
 
-  <!-- ASL Dictionary Modal -->
-  <div class="modal-overlay" id="guideModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 style="font-size: 1.1rem; font-weight: 600;">📘 ASL & Gesture Reference Guide</h3>
-        <button class="btn btn-sm" onclick="closeModal('guideModal')">✕</button>
-      </div>
-      <div class="modal-body">
-        <p>Hold a hand shape steady for <strong>0.5 seconds</strong> to type. The system recognizes the full ASL alphabet (A-Z), digits (0-9), and special control gestures:</p>
-
-        <div class="guide-callout">
-          <strong>Special Navigation Gestures:</strong><br>
-          • <strong>Thumbs Up</strong> = Add Space (finishes the current word and triggers word speech)<br>
-          • <strong>I Love You (🤟)</strong> = Add Period (finishes sentence and triggers full speech)<br>
-          • <strong>Open Palm Wave</strong> = Backspace (deletes previous letter)
-        </div>
-
-        <div class="dict-grid" id="dictCardsGrid">
-          <!-- Populated from /api/dictionary -->
-        </div>
-      </div>
-    </div>
+  <!-- Toast -->
+  <div class="toast-box" id="toast">
+    <span id="toastMsg">Action completed</span>
   </div>
 
-  <!-- 5G Lab Setup Modal -->
-  <div class="modal-overlay" id="netModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 style="font-size: 1.1rem; font-weight: 600;">🌐 5G Lab & Network Architecture</h3>
-        <button class="btn btn-sm" onclick="closeModal('netModal')">✕</button>
-      </div>
-      <div class="modal-body">
-        <p>SignSpeak is optimized for the private 5G Multi-access Edge Computing (MEC) lab at IIIT Dharwad (EC368). The Sparsh camera transmits over the lab's 5G network to the edge server VM <code>niralos-video</code> (<code>172.16.0.11</code>).</p>
-
-        <div class="guide-callout">
-          <strong>⚠️ Finding the 5G Camera WAN IP & Direct Ethernet Access:</strong><br>
-          1. The 5G modem assigns a dynamic WAN IP upon reconnecting (e.g. <code>10.101.0.70</code>).<br>
-          2. The modem admin page (<code>192.168.128.1</code>) is <strong>NOT</strong> accessible from Wi-Fi or over 5G.<br>
-          3. You <strong>MUST</strong> connect your laptop directly to the modem via an <strong>Ethernet cable</strong>.<br>
-          4. Set your laptop static IP to <code>192.168.128.100</code>, mask <code>255.255.255.0</code>.<br>
-          5. Open <code>http://192.168.128.1</code> in your browser, check the 5G WAN IP, and update <code>CAMERA_HOST</code> in <code>.env</code>.<br>
-          6. To access the camera web portal login directly via Ethernet, open <code>http://192.168.128.10:8080</code> (Login: <code>admin</code> / <code>admin123</code>).
-        </div>
-
-        <h4 style="margin-top: 14px; color: var(--text);">Direct RTSP Stream Paths (Sparsh Topsvision v2.1):</h4>
-        <div class="code-block">
-Substream (720p - Recommended):<br>
-rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=1.sdp<br><br>
-Mainstream (4K):<br>
-rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=0.sdp
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Settings Modal -->
-  <div class="modal-overlay" id="settingsModal">
-    <div class="modal-content" style="max-width: 540px;">
-      <div class="modal-header">
-        <h3 style="font-size: 1.1rem; font-weight: 600;">⚙️ Recognition & System Settings</h3>
-        <button class="btn btn-sm" onclick="closeModal('settingsModal')">✕</button>
-      </div>
-      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
-        <div>
-          <label style="font-size: 0.85rem; font-weight: 500; display: block; margin-bottom: 6px;">Camera Source (RTSP URL or Webcam Index):</label>
-          <input type="text" id="settingCamSource" style="width: 100%; padding: 8px 12px; background: #070A10; border: 1px solid var(--card-border); color: #FFF; border-radius: 6px;">
-        </div>
-
-        <div>
-          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px;">
-            <span>Hold Duration (ms):</span>
-            <span id="valHoldMs" style="color: var(--cyan); font-family: var(--font-mono);">500 ms</span>
-          </div>
-          <input type="range" id="settingHoldMs" min="150" max="1500" step="50" value="500" style="width: 100%;" oninput="document.getElementById('valHoldMs').textContent = this.value + ' ms'">
-        </div>
-
-        <div>
-          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px;">
-            <span>Confidence Cutoff:</span>
-            <span id="valConf" style="color: var(--cyan); font-family: var(--font-mono);">0.55</span>
-          </div>
-          <input type="range" id="settingConf" min="0.20" max="0.90" step="0.05" value="0.55" style="width: 100%;" oninput="document.getElementById('valConf').textContent = this.value">
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 0.85rem;">Mirror Camera Horizontally:</span>
-          <label class="switch">
-            <input type="checkbox" id="settingMirror" checked>
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 0.85rem;">Active AI Model:</span>
-          <select id="settingModelSelect" style="max-width: 180px;">
-            <option value="user">Personal Model (99.4%)</option>
-            <option value="legacy">Bundled Legacy ASL</option>
-          </select>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
-          <button class="btn btn-sm" onclick="closeModal('settingsModal')">Cancel</button>
-          <button class="btn btn-sm btn-primary" onclick="saveSettings()">Save Changes</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
+  <!-- ==================================================================
+       SCRIPTS: Live State, Web Speech Synthesis, Keyboard Shortcuts
+       ================================================================== -->
   <script>
-    // State
-    let lastSpokenSentence = "";
+    // Tab switching
+    function setPage(pageId) {
+      document.querySelectorAll('.page-view').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+
+      if (pageId === 'translate') {
+        document.getElementById('pageTranslate').classList.add('active');
+        document.getElementById('navTranslate').classList.add('active');
+      } else if (pageId === 'train') {
+        document.getElementById('pageTrain').classList.add('active');
+        document.getElementById('navTrain').classList.add('active');
+        loadDataset();
+      } else if (pageId === 'guide') {
+        document.getElementById('pageGuide').classList.add('active');
+        document.getElementById('navGuide').classList.add('active');
+      } else if (pageId === 'settings') {
+        document.getElementById('pageSettings').classList.add('active');
+        document.getElementById('navSettings').classList.add('active');
+        loadSettingsIntoForm();
+      }
+    }
+
+    // Toast
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      t.style.display = 'flex';
+      setTimeout(() => { t.style.display = 'none'; }, 2200);
+    }
+
+    // Mini Toggles
+    function toggleChip(id) {
+      const el = document.getElementById(id);
+      el.classList.toggle('active');
+    }
+
+    // Shrink long labels (e.g. "NICE TO MEET YOU") so they stay inside the dial.
+    function setDialChar(el, text) {
+      const t = String(text || '');
+      if (el.textContent !== t) el.textContent = t;
+      const len = t.length;
+      let size = 60;
+      if (len > 18) size = 13;
+      else if (len > 12) size = 16;
+      else if (len > 8) size = 19;
+      else if (len > 5) size = 24;
+      else if (len > 3) size = 32;
+      else if (len > 1) size = 44;
+      el.style.fontSize = size + 'px';
+    }
+
+    // Speech & Audio State (Sarvam Bulbul AI & Web Speech API)
     let synth = window.speechSynthesis;
     let selectedVoice = null;
-    let isPaused = false;
+    let currentSettings = {
+      tts_provider: 'sarvam',
+      tts_language: 'en-IN',
+      tts_rate: 0,
+      tts_volume: 100,
+      auto_word: true,
+      auto_sentence: true,
+      speak_letters: false
+    };
+    let activeAudioPlayer = null;
 
-    // Load available Web Speech API voices
-    function loadVoices() {
+    const isMicrosoft = v => /microsoft/i.test(v.name);
+
+    // Best device voice for a language, preferring Microsoft voices.
+    function pickVoice(lang) {
+      if (!synth) return null;
+      const voices = synth.getVoices();
+      const want = (lang || 'en-IN').toLowerCase();
+      const base = want.split('-')[0];
+      const norm = v => v.lang.toLowerCase().replace('_', '-');
+      const exact = v => norm(v) === want;
+      const same = v => norm(v).startsWith(base);
+      return voices.find(v => isMicrosoft(v) && exact(v))
+          || voices.find(v => isMicrosoft(v) && same(v))
+          || voices.find(exact) || voices.find(same) || null;
+    }
+
+    function englishVoice() {
+      if (selectedVoice && selectedVoice.lang.toLowerCase().startsWith('en')) return selectedVoice;
+      return pickVoice('en-IN') || pickVoice('en-US');
+    }
+
+    function populateVoices() {
       if (!synth) return;
       const voices = synth.getVoices();
-      const select = document.getElementById("voiceSelect");
-      select.innerHTML = "";
-
-      voices.forEach((voice, index) => {
-        const option = document.createElement("option");
-        option.value = index;
-        option.textContent = `${voice.name} (${voice.lang})${voice.default ? ' — Default' : ''}`;
-        select.appendChild(option);
-
-        // Prefer English / Indian English natural voices
-        if (!selectedVoice && (voice.lang.includes("en-IN") || voice.lang.includes("en-US"))) {
-          option.selected = true;
-          selectedVoice = voice;
-        }
+      const drop = document.getElementById('voiceDropdown');
+      if (!drop) return;
+      drop.innerHTML = '';
+      // English voices only, Microsoft ones first.
+      const english = voices
+        .map((v, idx) => ({ v, idx }))
+        .filter(o => o.v.lang.toLowerCase().startsWith('en'))
+        .sort((a, b) => (isMicrosoft(b.v) - isMicrosoft(a.v)));
+      if (!selectedVoice) selectedVoice = englishVoice();
+      english.forEach(({ v, idx }) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = `${v.name} (${v.lang})`;
+        if (selectedVoice && v.name === selectedVoice.name) opt.selected = true;
+        drop.appendChild(opt);
       });
-      if (!selectedVoice && voices.length > 0) {
-        selectedVoice = voices[0];
-      }
     }
 
     if (synth) {
-      loadVoices();
-      if (synth.onvoiceschanged !== undefined) {
-        synth.onvoiceschanged = loadVoices;
+      populateVoices();
+      if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = populateVoices;
+    }
+
+    function changeVoice() {
+      const drop = document.getElementById('voiceDropdown');
+      if (!synth || !drop) return;
+      const voices = synth.getVoices();
+      selectedVoice = voices[drop.value] || null;
+    }
+
+    function updateRateLabel(val) {
+      const v = parseInt(val);
+      const lbl = document.getElementById('valRate');
+      if (lbl) {
+        if (v === 0) lbl.textContent = 'Normal';
+        else if (v > 0) lbl.textContent = `Faster +${v}`;
+        else lbl.textContent = `Slower ${v}`;
       }
     }
 
-    function updateVoice() {
-      const select = document.getElementById("voiceSelect");
-      const voices = synth.getVoices();
-      selectedVoice = voices[select.value] || null;
+    // Save speech choices to the server right away. The status poll copies
+    // the server's settings into the page every 200 ms, so an unsaved
+    // dropdown change would otherwise snap back almost immediately.
+    async function persistSpeechSetting(values) {
+      Object.assign(currentSettings, values);
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(values)
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+      } catch (e) {
+        console.warn('Could not save speech setting:', e);
+        showToast('Could not save the speech setting');
+      }
     }
+
+    function onTTSProviderChange() {
+      persistSpeechSetting({ tts_provider: document.getElementById('cfgTTSProvider').value });
+    }
+
+    function onSarvamLangChange() {
+      const lang = document.getElementById('cfgSarvamLang').value;
+      persistSpeechSetting({ tts_language: lang });
+      stopSpeech();
+      showToast(lang.toLowerCase().startsWith('en')
+        ? 'Speech: English (Microsoft voice)'
+        : 'Speech: ' + lang + ' (Sarvam)');
+    }
+
+    let audioUnlocked = false;
+    function unlockAudio() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+      try {
+        const a = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+        a.play().catch(() => {});
+      } catch (e) {}
+    }
+    window.addEventListener('click', unlockAudio, { passive: true });
+    window.addEventListener('keydown', unlockAudio, { passive: true });
+    window.addEventListener('touchstart', unlockAudio, { passive: true });
+
+    const recentlySpokenWords = new Set();
+
+    // One voice at a time: every utterance goes through this queue, and a
+    // Sarvam clip only falls back to the device voice if Sarvam itself fails
+    // (never because we interrupted it), so two voices can't overlap.
+    const speechQueue = [];
+    let speechBusy = false;
+    let speechToken = 0;
+    let speakingNow = '';
 
     function speakText(text) {
-      if (!synth || !text || !text.trim()) return;
-      // Cancel previous utterance if any to keep zero latency
-      synth.cancel();
-      const utterance = new SpeechSynthesisUtterance(text.trim());
-      if (selectedVoice) utterance.voice = selectedVoice;
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      synth.speak(utterance);
+      if (!text || !text.trim()) return;
+      const clean = text.trim();
+      const upper = clean.toUpperCase();
+
+      // Never say the same text twice in a row: skip it if it is playing
+      // now, already queued, or was spoken in the last 4 seconds.
+      if (recentlySpokenWords.has(upper) || upper === speakingNow ||
+          speechQueue.some(q => q.toUpperCase() === upper)) {
+        console.debug('[speech] skipped duplicate:', clean);
+        return;
+      }
+      recentlySpokenWords.add(upper);
+      setTimeout(() => recentlySpokenWords.delete(upper), 4000);
+
+      console.debug('[speech] queued:', clean);
+      speechQueue.push(clean);
+      if (speechQueue.length > 4) speechQueue.splice(0, speechQueue.length - 4);
+      pumpSpeech();
     }
 
-    function speakCurrentText() {
-      const transcript = document.getElementById("transcriptDisplay").textContent;
-      const word = document.getElementById("activeWordDisplay").textContent;
-      const toSpeak = (transcript + " " + (word.startsWith("[") ? "" : word)).trim();
-      speakText(toSpeak || "No text transcribed yet");
+    function stopSpeech() {
+      speechQueue.length = 0;
+      speechToken++;
+      speechBusy = false;
+      speakingNow = '';
+      haltAudio();
     }
 
-    // Populate Virtual Alphabet Keyboard (A-Z, 0-9)
-    const keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
-    const kbContainer = document.getElementById("virtualKeyboard");
-    keys.forEach(k => {
-      const btn = document.createElement("button");
-      btn.className = "v-key";
-      btn.textContent = k;
-      btn.onclick = () => sendAction("type", k);
-      kbContainer.appendChild(btn);
-    });
-
-    // Polling API Status Loop (200ms)
-    async function pollStatus() {
-      try {
-        const res = await fetch("/api/status");
-        if (!res.ok) throw new Error("Status failed");
-        const data = await res.json();
-        updateUI(data);
-      } catch (err) {
-        document.getElementById("connDot").className = "pulse-dot offline";
-        document.getElementById("connStatus").textContent = "Connecting...";
+    function haltAudio() {
+      if (activeAudioPlayer) {
+        try { activeAudioPlayer.pause(); activeAudioPlayer.removeAttribute('src'); } catch (e) {}
+        activeAudioPlayer = null;
       }
-      setTimeout(pollStatus, 250);
+      try { if (synth) synth.cancel(); } catch (e) {}
     }
 
-    function updateUI(data) {
-      // 1. Connection & FPS
-      const cam = data.camera;
-      const connDot = document.getElementById("connDot");
-      const connStatus = document.getElementById("connStatus");
-      if (cam.connected) {
-        connDot.className = "pulse-dot";
-        connStatus.textContent = cam.source;
-      } else {
-        connDot.className = "pulse-dot offline";
-        connStatus.textContent = cam.error ? "Offline" : "Reconnecting...";
+    // If the dashboard is open in more than one tab, only the tab that is
+    // speaking right now keeps talking.
+    let speechChannel = null;
+    try {
+      speechChannel = new BroadcastChannel('signspeak-speech');
+      speechChannel.onmessage = () => stopSpeech();
+    } catch (e) {}
+
+    // Returns the Sarvam language code for Indian-script text, or null for
+    // English / Latin text. Devanagari follows the chosen language (Hindi or
+    // Marathi), defaulting to Hindi.
+    function indianLanguageOf(text) {
+      const scripts = [
+        [/[ঀ-৿]/, 'bn-IN'], [/[਀-੿]/, 'pa-IN'],
+        [/[઀-૿]/, 'gu-IN'], [/[଀-୿]/, 'od-IN'],
+        [/[஀-௿]/, 'ta-IN'], [/[ఀ-౿]/, 'te-IN'],
+        [/[ಀ-೿]/, 'kn-IN'], [/[ഀ-ൿ]/, 'ml-IN'],
+      ];
+      for (const [re, code] of scripts) if (re.test(text)) return code;
+      if (/[ऀ-ॿ]/.test(text)) {
+        const chosen = currentSettings.tts_language || '';
+        return chosen === 'mr-IN' ? 'mr-IN' : 'hi-IN';
       }
-      document.getElementById("fpsDisplay").textContent = `${cam.fps} FPS`;
-      document.getElementById("streamResBadge").textContent = `${cam.width}x${cam.height}`;
+      return null;
+    }
 
-      // 2. Model info
-      if (data.model && data.model.name) {
-        document.getElementById("modelDisplay").textContent = `${data.model.algorithm} (${data.model.accuracy || 99.4}%)`;
+    function pumpSpeech() {
+      if (speechBusy) return;
+      const next = speechQueue.shift();
+      if (!next) return;
+      speechBusy = true;
+      speakingNow = next.toUpperCase();
+      const token = ++speechToken;
+      let finished = false;
+      const done = () => {
+        if (finished || token !== speechToken) return;
+        finished = true;
+        clearTimeout(guard);
+        activeAudioPlayer = null;
+        speechBusy = false;
+        speakingNow = '';
+        pumpSpeech();
+      };
+      // Safety net: if a clip never reports "ended", stop it before moving on
+      // so the next one can't play on top of it.
+      const guard = setTimeout(() => { if (token === speechToken) haltAudio(); done(); }, 20000);
+
+      haltAudio();
+      try { if (speechChannel) speechChannel.postMessage('speaking'); } catch (e) {}
+
+      const provider = currentSettings.tts_provider || 'sarvam';
+      const chosen = currentSettings.tts_language || 'en-IN';
+      // Selected language decides: English -> Microsoft voice, any Indian
+      // language -> Sarvam in that language. Text already written in an
+      // Indian script always goes to Sarvam in its own language.
+      const lang = indianLanguageOf(next) || (chosen.toLowerCase().startsWith('en') ? null : chosen);
+
+      if (!lang) {
+        speakLocal(next, done, token, englishVoice());
+        return;
       }
-
-      // 3. Recognition HUD
-      const rec = data.recognition;
-      const signBadge = document.getElementById("signBadge");
-      const signChar = document.getElementById("signChar");
-      const signSub = document.getElementById("signSub");
-      const confBar = document.getElementById("confBar");
-      const confVal = document.getElementById("confValue");
-      const holdBar = document.getElementById("holdBar");
-      const holdVal = document.getElementById("holdValue");
-
-      if (rec.hand_present && rec.display_name) {
-        signChar.textContent = rec.display_name;
-        signSub.textContent = rec.is_stable ? "LOCKED" : "HOLDING";
-        signBadge.className = rec.is_stable ? "sign-badge stable" : "sign-badge";
-        const confPct = Math.round(rec.confidence * 100);
-        confBar.style.width = `${confPct}%`;
-        confVal.textContent = `${confPct}%`;
-        const holdPct = Math.round(rec.hold_progress * 100);
-        holdBar.style.width = `${holdPct}%`;
-        holdVal.textContent = `${holdPct}%`;
-      } else {
-        signChar.textContent = "—";
-        signSub.textContent = "NO HAND";
-        signBadge.className = "sign-badge";
-        confBar.style.width = "0%";
-        confVal.textContent = "0%";
-        holdBar.style.width = "0%";
-        holdVal.textContent = "0%";
-      }
-
-      // Top predictions
-      const predsBox = document.getElementById("topPredictionsBox");
-      if (rec.top && rec.top.length > 0) {
-        predsBox.innerHTML = rec.top.slice(0, 3).map(p => 
-          `<div class="prediction-chip"><span>${p.label}</span><span>${Math.round(p.confidence * 100)}%</span></div>`
-        ).join("");
-      }
-
-      // 4. Word and Transcript
-      const comp = data.composer;
-      const wordDisplay = document.getElementById("activeWordDisplay");
-      if (comp.word) {
-        wordDisplay.textContent = comp.word;
-        wordDisplay.className = "current-word";
-      } else {
-        wordDisplay.textContent = "[waiting for sign]";
-        wordDisplay.className = "current-word empty";
+      if (provider !== 'sarvam') {
+        speakLocal(next, done, token, pickVoice(lang) || englishVoice());
+        return;
       }
 
-      const transcriptBox = document.getElementById("transcriptDisplay");
-      if (transcriptBox.textContent !== comp.transcript) {
-        transcriptBox.textContent = comp.transcript;
-        transcriptBox.scrollTop = transcriptBox.scrollHeight;
-      }
+      // Other Indian languages -> Sarvam Bulbul.
+      const url = `/api/tts?text=${encodeURIComponent(next)}&language=${encodeURIComponent(lang)}&t=${Date.now()}`;
+      const audio = new Audio(url);
+      activeAudioPlayer = audio;
+      const vol = (currentSettings.tts_volume ?? 100) / 100;
+      audio.volume = Math.max(0, Math.min(1, vol));
 
-      // 5. Check Speech Events (Trigger speech for newly committed words/sentences)
-      if (data.events && data.events.length > 0) {
-        data.events.forEach(ev => {
-          const autoWord = document.getElementById("autoWordCheck").checked;
-          const autoSentence = document.getElementById("autoSentenceCheck").checked;
-
-          if (ev.kind === "space" && autoWord && ev.speak_word) {
-            speakText(ev.speak_word);
-          } else if (ev.kind === "period" && autoSentence && ev.speak_sentence) {
-            speakText(ev.speak_sentence);
-          } else if (ev.kind === "word" && autoWord && ev.speak_word) {
-            speakText(ev.speak_word);
-          }
+      let fellBack = false;
+      const fallback = (err) => {
+        if (fellBack || finished || token !== speechToken) return;
+        fellBack = true;
+        console.warn('Sarvam audio unavailable, using Microsoft voice:', err);
+        audio.onended = null;
+        audio.onerror = null;
+        try { audio.pause(); audio.removeAttribute('src'); } catch (e) {}
+        activeAudioPlayer = null;
+        speakLocal(next, done, token, pickVoice(lang) || englishVoice());
+      };
+      audio.onended = done;
+      audio.onerror = () => fallback(audio.error);
+      const p = audio.play();
+      if (p !== undefined) {
+        p.catch(err => {
+          if (err && err.name === 'AbortError') return;  // interrupted on purpose
+          fallback(err);
         });
+      }
+    }
+
+    function speakLocal(text, done, token, voice) {
+      if (!synth || !text || token !== speechToken) { done(); return; }
+      try {
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        if (voice) { u.voice = voice; u.lang = voice.lang; }
+        const vol = (currentSettings.tts_volume ?? 100) / 100;
+        u.volume = Math.max(0, Math.min(1, vol));
+        u.rate = Math.max(0.5, Math.min(2, 1 + (currentSettings.tts_rate || 0) * 0.05));
+        u.onend = done;
+        u.onerror = done;
+        synth.speak(u);
+      } catch (e) {
+        console.error('Local speech error:', e);
+        done();
+      }
+    }
+
+    function speakCurrentSentence() {
+      const t = document.getElementById('transcriptArea').textContent;
+      const w = document.getElementById('wordField').textContent;
+      const combined = (t + ' ' + w).trim();
+      stopSpeech();
+      recentlySpokenWords.clear();
+      speakText(combined || 'No words transcribed yet');
+    }
+
+    function testVoice() {
+      const provider = currentSettings.tts_provider || 'sarvam';
+      if (provider === 'sarvam') {
+        const lang = currentSettings.tts_language || 'en-IN';
+        const phrases = {
+          'hi-IN': 'नमस्ते, यह साइनस्पीक वाणी संश्लेषण है।',
+          'en-IN': 'SignSpeak Indian English speech synthesis is active and ready.',
+          'ta-IN': 'சைன்ஸ்பீக் பேச்சு தொகுப்பு தயாராக உள்ளது.',
+          'te-IN': 'సైన్‌స్పీక్ స్పీచ్ సింథసిస్ సిద్ధంగా ఉంది.',
+          'bn-IN': 'সাইনস্পিক স্পিচ সিন্থেসিস প্রস্তুত।',
+          'kn-IN': 'ಸೈನ್‌ಸ್ಪೀಕ್ ಭಾಷಣ ಸಂಶ್ಲೇಷಣೆ ಸಿದ್ಧವಾಗಿದೆ.',
+          'ml-IN': 'സൈൻസ്പീക്ക് സംഭാഷണ സംശ്ലേഷണം തയ്യാറാണ്.',
+          'mr-IN': 'साइनस्पीक वाणी संश्लेषण सज्ज आहे.',
+          'gu-IN': 'સાઇનસ્પીક વાણી સંશ્લેષણ તૈયાર છે.',
+          'pa-IN': 'ਸਾਈਨਸਪੀਕ ਸਪੀਚ ਸੰਸ਼ਲੇਸ਼ਣ ਤਿਆਰ ਹੈ.',
+          'od-IN': 'ସାଇନସ୍ପିକ ବାଣୀ ସଂଶ୍ଳେଷଣ ପ୍ରସ୍ତୁତ ଅଛି।'
+        };
+        stopSpeech();
+        recentlySpokenWords.clear();
+        if (lang.toLowerCase().startsWith('en')) {
+          speakText('SignSpeak English voice is active and ready.');
+          const v = englishVoice();
+          showToast('Playing English test via ' + (v ? v.name : 'device voice'));
+        } else {
+          speakText(phrases[lang] || phrases['hi-IN']);
+          showToast('Playing voice test via Sarvam Bulbul (' + lang + ')');
+        }
+      } else {
+        stopSpeech();
+        recentlySpokenWords.clear();
+        speakText('SignSpeak Microsoft voice is active and ready.');
+        showToast('Playing Microsoft voice test');
       }
     }
 
     // Actions
-    async function sendAction(action, param = "") {
+    async function sendAction(action, param = '') {
       try {
-        const res = await fetch("/api/action", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const res = await fetch('/api/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action, param })
         });
         const data = await res.json();
-        if (data.result) {
-          if (data.result.speak_word && document.getElementById("autoWordCheck").checked) {
-            speakText(data.result.speak_word);
-          }
+        if (data.result && data.result.speak_word) {
+          speakText(data.result.speak_word);
+        }
+        else if (data.result && data.result.speak_sentence) {
+          speakText(data.result.speak_sentence);
         }
       } catch (err) {
         console.error(err);
       }
     }
 
-    function clearTranscript() {
-      sendAction("clear");
-      document.getElementById("transcriptDisplay").textContent = "";
-      document.getElementById("activeWordDisplay").textContent = "[waiting for sign]";
-      document.getElementById("activeWordDisplay").className = "current-word empty";
-    }
-
     function copyTranscript() {
-      const text = document.getElementById("transcriptDisplay").textContent;
-      navigator.clipboard.writeText(text);
-      alert("Transcript copied to clipboard!");
+      const t = document.getElementById('transcriptArea').textContent;
+      navigator.clipboard.writeText(t);
+      showToast('Transcript copied to clipboard');
     }
 
-    async function switchCameraPreset(preset) {
-      document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
-      if (preset === "5g") document.getElementById("btnPreset5G").classList.add("active");
-      if (preset === "ethernet") document.getElementById("btnPresetEth").classList.add("active");
-      if (preset === "webcam") document.getElementById("btnPresetWebcam").classList.add("active");
-
-      await fetch("/api/camera", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preset })
+    let isMirror = true;
+    function toggleMirror() {
+      isMirror = !isMirror;
+      document.getElementById('mirrorBtn').classList.toggle('active', isMirror);
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mirror: isMirror })
       });
     }
 
-    async function openCustomCamPrompt() {
-      const url = prompt("Enter RTSP URL, device index (e.g. 0), or test video path:");
-      if (url && url.trim()) {
-        document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
-        await fetch("/api/camera", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source: url.trim() })
-        });
-      }
-    }
-
+    let isPaused = false;
     async function togglePause() {
-      const res = await fetch("/api/pause", { method: "POST" });
-      const data = await res.json();
-      isPaused = data.paused;
-      document.getElementById("pauseBtn").textContent = isPaused ? "▶ Resume" : "⏸ Pause";
+      const res = await fetch('/api/pause', { method: 'POST' });
+      const d = await res.json();
+      isPaused = d.paused;
+      document.getElementById('pauseBtn').classList.toggle('active', isPaused);
+      showToast(isPaused ? 'Camera paused' : 'Camera resumed');
     }
 
-    function toggleFullscreen() {
-      const el = document.getElementById("videoContainer");
-      if (!document.fullscreenElement) {
-        el.requestFullscreen().catch(err => alert(err.message));
+    let current5GHost = '10.101.0.74';
+
+    function onSettingCamModeChange(mode) {
+      const row5G = document.getElementById('row5GIp');
+      if (row5G) row5G.style.display = (mode === '5g') ? 'block' : 'none';
+    }
+
+    async function applyQuick5GIp() {
+      const input = document.getElementById('quick5GIp');
+      const ip = input ? input.value.trim() : '';
+      if (!ip) {
+        showToast('Please enter a valid 5G IP address');
+        return;
+      }
+      current5GHost = ip;
+      showToast('Setting 5G IP to ' + ip + ' & connecting…');
+      try {
+        const res = await fetch('/api/camera', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: '5g', host: ip })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          const opt = document.getElementById('opt5g');
+          if (opt) opt.textContent = '📶 5G Modem (' + ip + ':554)';
+          const camSel = document.getElementById('cameraSelect');
+          if (camSel) camSel.value = '5g';
+          showToast('5G RTSP Camera set to ' + ip);
+        }
+        setTimeout(retryStream, 350);
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to switch to 5G camera');
+      }
+    }
+
+    async function onCameraSelect(val) {
+      if (val === '5g') {
+        const quickInput = document.getElementById('quick5GIp');
+        if (quickInput && quickInput.value.trim()) {
+          current5GHost = quickInput.value.trim();
+        }
+      }
+      showToast('Switching camera to: ' + val + '…');
+      try {
+        const bodyPayload = { mode: val };
+        if (val === '5g') {
+          bodyPayload.host = current5GHost;
+        }
+        const res = await fetch('/api/camera', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPayload)
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          if (data.host_5g) {
+            current5GHost = data.host_5g;
+            const opt = document.getElementById('opt5g');
+            if (opt) opt.textContent = '📶 5G Modem (' + current5GHost + ':554)';
+            const quick = document.getElementById('lbl5GHostQuick');
+            if (quick) quick.textContent = current5GHost + ' (Dynamic RTSP :554)';
+            const inp = document.getElementById('cfg5GIp');
+            if (inp) inp.value = current5GHost;
+            const qInp = document.getElementById('quick5GIp');
+            if (qInp && document.activeElement !== qInp) qInp.value = current5GHost;
+          }
+          const labelMap = { laptop: 'Laptop Webcam (0)', ethernet: 'Direct Ethernet (192.168.128.10)', '5g': '5G Modem Camera' };
+          showToast('Active camera: ' + (labelMap[data.mode] || data.source));
+        }
+        setTimeout(retryStream, 350);
+      } catch (err) {
+        console.error(err);
+        showToast('Camera switch request failed');
+      }
+    }
+
+    function retryStream() {
+      const t = Date.now();
+      const img1 = document.getElementById('cameraStream');
+      const img2 = document.getElementById('trainCameraStream');
+      if (img1) img1.src = '/video_feed?t=' + t;
+      if (img2) img2.src = '/video_feed?t=' + t;
+    }
+
+    // Polling /api/status (every 200ms)
+    const CIRCUMFERENCE = 552.92; // 2 * PI * 88
+
+    // Smooth hold-threshold ring. Status arrives every ~200 ms (slower over
+    // the network), so the ring is drawn every animation frame: while a sign
+    // is being held it keeps filling at the configured hold rate between
+    // polls, and it eases toward each new server value instead of jumping.
+    const dialAnim = { target: 0, shown: 0, rising: false, last: performance.now() };
+    function setDialTarget(p, stable) {
+      p = Math.max(0, Math.min(1, p || 0));
+      dialAnim.rising = !stable && p > 0 && p < 1 && p >= dialAnim.target - 0.02;
+      dialAnim.target = stable ? 1 : p;
+    }
+    function dialFrame(now) {
+      const dt = Math.min(100, now - dialAnim.last);
+      dialAnim.last = now;
+      const k = 1 - Math.exp(-dt / 90);
+      if (dialAnim.rising) {
+        const holdMs = Math.max(150, currentSettings.hold_ms || 500);
+        const cap = Math.min(0.98, dialAnim.target + 0.35);
+        const predicted = Math.min(cap, dialAnim.shown + dt / holdMs);
+        dialAnim.shown = Math.max(predicted, dialAnim.shown + (dialAnim.target - dialAnim.shown) * k);
       } else {
-        document.exitFullscreen();
+        dialAnim.shown += (dialAnim.target - dialAnim.shown) * k;
       }
+      if (Math.abs(dialAnim.shown - dialAnim.target) < 0.001 && !dialAnim.rising) dialAnim.shown = dialAnim.target;
+      const ring = document.getElementById('dialRing');
+      if (ring) ring.style.strokeDashoffset = (CIRCUMFERENCE * (1 - dialAnim.shown)).toFixed(2);
+      requestAnimationFrame(dialFrame);
     }
+    requestAnimationFrame(dialFrame);
+    let lastCommittedSign = '';
 
-    function takeSnapshot() {
-      const img = document.getElementById("liveFeed");
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth || 1280;
-      canvas.height = img.naturalHeight || 720;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const link = document.createElement("a");
-      link.download = `signspeak_snapshot_${Date.now()}.jpg`;
-      link.href = canvas.toDataURL("image/jpeg", 0.9);
-      link.click();
-    }
-
-    function handleStreamError() {
-      console.warn("Stream interrupted, reconnecting...");
-      setTimeout(() => {
-        document.getElementById("liveFeed").src = "/video_feed?t=" + Date.now();
-      }, 1500);
-    }
-
-    // Modals
-    function openModal(id) {
-      document.getElementById(id).classList.add("open");
-      if (id === "guideModal" && document.getElementById("dictCardsGrid").children.length === 0) {
-        loadDictionary();
+    let lastStatusErrorAt = 0;
+    async function pollStatus() {
+      try {
+        const res = await fetch('/api/status');
+        if (!res.ok) throw new Error(`Status request failed (${res.status})`);
+        updateUI(await res.json());
+      } catch (e) {
+        if (Date.now() - lastStatusErrorAt > 5000) {
+          console.warn('SignSpeak status unavailable:', e);
+          lastStatusErrorAt = Date.now();
+        }
       }
-      if (id === "settingsModal") {
-        fetch("/api/status").then(r => r.json()).then(d => {
-          document.getElementById("settingCamSource").value = d.camera.raw_source || "";
-          document.getElementById("settingHoldMs").value = d.settings.hold_ms || 500;
-          document.getElementById("valHoldMs").textContent = (d.settings.hold_ms || 500) + " ms";
-          document.getElementById("settingConf").value = d.settings.confidence || 0.55;
-          document.getElementById("valConf").textContent = d.settings.confidence || 0.55;
-          document.getElementById("settingMirror").checked = d.settings.mirror !== false;
-          document.getElementById("settingModelSelect").value = d.settings.active_model || "user";
+      setTimeout(pollStatus, 200);
+    }
+
+    function updateUI(d) {
+      // 1. Sidebar & Header Status
+      const cam = d.camera;
+      document.getElementById('fpsLabel').textContent = cam.fps.toFixed(1) + ' FPS';
+      const sideCam = document.getElementById('sideCamera');
+      const livePill = document.getElementById('liveStatusPill');
+      const headerCamPill = document.getElementById('headerCameraPill');
+      const trainCamPill = document.getElementById('trainPreviewPill');
+      const btnRec = document.getElementById('btnRecordSign');
+
+      if (cam && cam.host_5g) {
+        current5GHost = cam.host_5g;
+        const opt = document.getElementById('opt5g');
+        if (opt) opt.textContent = '📶 5G Modem (' + current5GHost + ':554)';
+        const quick = document.getElementById('lbl5GHostQuick');
+        if (quick) quick.textContent = current5GHost + ' (Dynamic RTSP :554)';
+        const cfg5G = document.getElementById('cfg5GIp');
+        if (cfg5G && document.activeElement !== cfg5G) cfg5G.value = current5GHost;
+      }
+
+      const camSel = document.getElementById('cameraSelect');
+      if (camSel && document.activeElement !== camSel) {
+        const mode = cam.mode || (cam.raw_source === '0' ? 'laptop' : (cam.raw_source && cam.raw_source.includes('192.168.128.10') ? 'ethernet' : '5g'));
+        camSel.value = mode;
+      }
+
+      if (cam.connected) {
+        sideCam.textContent = 'Live';
+        sideCam.className = 'val green';
+        livePill.textContent = 'LIVE';
+        livePill.setAttribute('tone', 'green');
+        headerCamPill.textContent = 'LIVE · 172.16.0.11';
+        headerCamPill.setAttribute('tone', 'green');
+        if (trainCamPill) {
+          trainCamPill.textContent = 'LIVE';
+          trainCamPill.setAttribute('tone', 'green');
+        }
+        if (btnRec && !isRecordingActive) btnRec.disabled = false;
+      } else {
+        sideCam.textContent = 'Offline';
+        sideCam.className = 'val amber';
+        livePill.textContent = 'OFFLINE';
+        livePill.setAttribute('tone', 'red');
+        headerCamPill.textContent = 'STARTING';
+        headerCamPill.setAttribute('tone', 'amber');
+        if (trainCamPill) {
+          trainCamPill.textContent = 'OFFLINE';
+          trainCamPill.setAttribute('tone', 'red');
+        }
+        if (btnRec && !isRecordingActive) btnRec.disabled = true;
+      }
+
+      // 2. Model Info
+      if (d.model && d.model.name) {
+        const accuracy = d.model.accuracy;
+        const mText = accuracy === null ? 'Personal' : `Personal (${accuracy.toFixed(1)}%)`;
+        document.getElementById('sideModel').textContent = mText;
+        document.getElementById('headerModelPill').textContent = d.model.name + (accuracy === null ? '' : ` · ${accuracy.toFixed(1)}%`);
+        const trHeadPill = document.getElementById('trainHeaderPill');
+        const cardModPill = document.getElementById('cardModelPill');
+        if (trHeadPill) {
+          trHeadPill.textContent = 'PERSONAL MODEL';
+          trHeadPill.setAttribute('tone', 'green');
+        }
+        if (cardModPill) {
+          cardModPill.textContent = 'PERSONAL';
+          cardModPill.setAttribute('tone', 'green');
+        }
+        const cName = document.getElementById('cardModelName');
+        if (cName) cName.textContent = d.model.name;
+        const cDet = document.getElementById('cardModelDetail');
+        if (cDet) cDet.textContent = `${d.model.algorithm} · ${d.model.classes_count} signs${d.model.samples === null ? '' : ` · ${d.model.samples} samples`}`;
+        const cAcc = document.getElementById('cardModelAccuracy');
+        if (cAcc) {
+          cAcc.textContent = d.model.balanced_accuracy !== null
+            ? `${d.model.balanced_accuracy.toFixed(1)}% balanced · ${d.model.validation_method || 'validation'}`
+            : (accuracy === null ? 'Validation score unavailable' : `${accuracy.toFixed(1)}% validation accuracy`);
+        }
+        document.getElementById('sideModel').className = 'val green';
+        const action = document.getElementById('btnPersonalModelActive');
+        if (action) {
+          action.disabled = true;
+          action.textContent = 'Personal model active';
+          action.onclick = null;
+        }
+      } else if (d.model && d.model.error) {
+        document.getElementById('sideModel').textContent = 'Unavailable';
+        document.getElementById('sideModel').className = 'val amber';
+        document.getElementById('headerModelPill').textContent = 'PERSONAL MODEL ERROR';
+        const name = document.getElementById('cardModelName');
+        const detail = document.getElementById('cardModelDetail');
+        const accuracy = document.getElementById('cardModelAccuracy');
+        const action = document.getElementById('btnPersonalModelActive');
+        if (name) name.textContent = 'Personal model unavailable';
+        if (detail) detail.textContent = d.model.error;
+        if (accuracy) accuracy.textContent = 'Train or load a valid personal model.';
+        if (action) {
+          action.disabled = false;
+          action.textContent = 'Train personal model';
+          action.onclick = () => setPage('train');
+        }
+      }
+
+      // 3. SignDial & Detected Sign Card
+      const rec = d.recognition;
+      const dialRing = document.getElementById('dialRing');
+      const dialChar = document.getElementById('dialChar');
+      const dialCaption = document.getElementById('dialCaption');
+      const dialDisc = document.getElementById('dialDisc');
+      const confPct = document.getElementById('confPct');
+      const confBar = document.getElementById('confBar');
+      const detectTitle = document.getElementById('detectTitle');
+
+      if (rec.hand_present && rec.display_name && rec.display_name !== '—') {
+        setDialChar(dialChar, rec.display_name);
+        detectTitle.textContent = rec.display_name;
+        const progress = Math.max(0, Math.min(1, rec.hold_progress));
+        setDialTarget(progress, !!rec.is_stable);
+
+        if (rec.is_stable) {
+          dialCaption.textContent = 'LOCKED';
+          dialCaption.style.color = 'var(--green)';
+        } else {
+          dialCaption.textContent = 'READING…';
+          dialCaption.style.color = 'var(--amber)';
+        }
+
+        const pct = Math.round(rec.confidence * 100);
+        confPct.textContent = pct + '%';
+        confBar.style.width = pct + '%';
+      } else {
+        setDialChar(dialChar, '—');
+        detectTitle.textContent = cam.connected ? 'Waiting for hand…' : (cam.error || 'Connecting to camera…');
+        dialCaption.textContent = cam.connected ? 'SHOW YOUR HAND' : 'CAMERA OFFLINE';
+        dialCaption.style.color = cam.connected ? 'var(--faint)' : 'var(--red)';
+        setDialTarget(0, false);
+        confPct.textContent = '—';
+        confBar.style.width = '0%';
+      }
+
+      // 4. Current Word & Transcript
+      // Keep the pause button in sync with the server's real state.
+      if (d.recognition && typeof d.recognition.paused === 'boolean' && d.recognition.paused !== isPaused) {
+        isPaused = d.recognition.paused;
+        const pb = document.getElementById('pauseBtn');
+        if (pb) pb.classList.toggle('active', isPaused);
+      }
+
+      const comp = d.composer;
+      const wordField = document.getElementById('wordField');
+      wordField.textContent = comp.word || '';
+      document.getElementById('letterCount').textContent = (comp.word ? comp.word.length : 0) + ' letters';
+
+      const transcriptArea = document.getElementById('transcriptArea');
+      if (transcriptArea.textContent !== comp.transcript) {
+        transcriptArea.textContent = comp.transcript || '';
+        transcriptArea.scrollTop = transcriptArea.scrollHeight;
+      }
+
+      // 5. Settings sync
+      if (d.settings) {
+        currentSettings = Object.assign({}, currentSettings, d.settings);
+      }
+
+      // 6. Speech Events
+      if (d.events && d.events.length > 0) {
+        d.events.forEach(ev => {
+          // Trigger visual flash on dial
+          dialDisc.classList.add('flash');
+          dialCaption.textContent = 'TYPED';
+          setTimeout(() => dialDisc.classList.remove('flash'), 360);
+
+          if (ev.speak_word) {
+            speakText(ev.speak_word);
+          } else if (ev.speak_sentence) {
+            speakText(ev.speak_sentence);
+          } else if (ev.kind === 'letter' && (d.settings.speak_letters || currentSettings.speak_letters) && ev.sign) {
+            speakText(ev.sign);
+          }
         });
       }
     }
 
-    function closeModal(id) {
-      document.getElementById(id).classList.remove("open");
+    // Keyboard Shortcuts & Direct Typing
+
+    // A clicked button keeps keyboard focus, so Space/Enter would also
+    // "click" it (e.g. Speak Now) on top of our shortcut -> two voices.
+    // Drop focus from buttons after mouse clicks, and swallow the key-up
+    // activation of Space/Enter on any focused button.
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest && e.target.closest('button');
+      if (btn && e.detail > 0) btn.blur();
+    });
+    window.addEventListener('keyup', (e) => {
+      if ((e.key === ' ' || e.code === 'Space' || e.key === 'Enter') &&
+          e.target && (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT')) {
+        e.preventDefault();
+      }
+    }, true);
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      // Typing / Esc-to-pause shortcuts belong to the Translate page only, so
+      // pressing Esc or keys while training never pauses recognition.
+      const translatePage = document.getElementById('pageTranslate');
+      if (!translatePage || !translatePage.classList.contains('active')) return;
+      if (e.repeat && (e.key === ' ' || e.code === 'Space' || e.key === 'Enter' || e.key === '.')) {
+        e.preventDefault();
+        return;
+      }
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') {
+        if (e.key === ' ' || e.code === 'Space' || e.key === 'Enter') e.target.blur();
+      }
+
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        sendAction('space');
+      } else if (e.key === '.' || e.key === 'Period') {
+        e.preventDefault();
+        sendAction('period');
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const currentWord = document.getElementById('wordField').textContent.trim();
+        if (currentWord) {
+          sendAction('space');
+        } else {
+          sendAction('commit_now');
+        }
+      } else if (e.key === 'Backspace' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        sendAction('delete_word');
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        sendAction('backspace');
+      } else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        sendAction('type', e.key.toUpperCase());
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        togglePause();
+      } else if (e.key === 'r' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        sendAction('clear_all');
+        showToast('Transcript reset');
+      }
+    });
+
+    // Settings sync (Complete matching SettingsPage)
+    async function loadSettingsIntoForm() {
+      const res = await fetch('/api/status');
+      const d = await res.json();
+      const s = d.settings;
+      currentSettings = Object.assign({}, currentSettings, s);
+
+      // Camera
+      const camMode = d.camera.mode || (d.camera.raw_source === '0' ? 'laptop' : (d.camera.raw_source && d.camera.raw_source.includes('192.168.128.10') ? 'ethernet' : '5g'));
+      const selMode = document.getElementById('cfgCamMode');
+      if (selMode) selMode.value = camMode;
+      const inp5G = document.getElementById('cfg5GIp');
+      if (inp5G) inp5G.value = d.camera.host_5g || current5GHost;
+      onSettingCamModeChange(camMode);
+      document.getElementById('cfgInferenceWidth').value = s.inference_width || 800;
+      document.getElementById('cfgMirror').checked = s.mirror !== false;
+
+      // Recognition
+      document.getElementById('cfgHold').value = s.hold_ms || 500;
+      document.getElementById('valHold').textContent = (s.hold_ms || 500) + ' ms';
+      document.getElementById('cfgSmoothing').value = s.smoothing || 8;
+      document.getElementById('valSmoothing').textContent = (s.smoothing || 8) + ' frames';
+      const votePct = Math.round((s.min_vote_ratio || 0.60) * 100);
+      document.getElementById('cfgVoteRatio').value = votePct;
+      document.getElementById('valVoteRatio').textContent = votePct + '%';
+      document.getElementById('cfgConf').value = s.confidence || 0.55;
+      document.getElementById('valConf').textContent = s.confidence || 0.55;
+
+      // Speech & Audio
+      document.getElementById('cfgTTSProvider').value = s.tts_provider || 'sarvam';
+      document.getElementById('cfgSarvamLang').value = s.tts_language || 'en-IN';
+      document.getElementById('cfgRate').value = s.tts_rate || 0;
+      updateRateLabel(s.tts_rate || 0);
+      document.getElementById('cfgVolume').value = s.tts_volume || 100;
+      document.getElementById('valVolume').textContent = (s.tts_volume || 100) + '%';
+      document.getElementById('cfgAutoWord').checked = s.auto_word !== false;
+      document.getElementById('cfgAutoSentence').checked = s.auto_sentence !== false;
+      document.getElementById('cfgSpeakLetters').checked = s.speak_letters === true;
+
+      // Advanced & Display
+      document.getElementById('cfgCooldown').value = s.cooldown_ms || 200;
+      document.getElementById('valCooldown').textContent = (s.cooldown_ms || 200) + ' ms';
+      document.getElementById('cfgRelease').value = s.release_ms || 250;
+      document.getElementById('valRelease').textContent = (s.release_ms || 250) + ' ms';
+      document.getElementById('cfgDrawOverlay').checked = s.draw_overlay !== false;
+      document.getElementById('cfgShowFps').checked = s.show_fps !== false;
+
+      onTTSProviderChange();
     }
 
-    async function loadDictionary() {
+    async function saveSettings() {
+      const chosenCamMode = document.getElementById('cfgCamMode') ? document.getElementById('cfgCamMode').value : 'laptop';
+      const new5gIp = document.getElementById('cfg5GIp') ? document.getElementById('cfg5GIp').value.trim() : '';
+      const inference_width = parseInt(document.getElementById('cfgInferenceWidth').value) || 800;
+      const mirror = document.getElementById('cfgMirror').checked;
+
+      const hold_ms = parseInt(document.getElementById('cfgHold').value);
+      const smoothing = parseInt(document.getElementById('cfgSmoothing').value);
+      const min_vote_ratio = parseFloat(document.getElementById('cfgVoteRatio').value) / 100.0;
+      const confidence = parseFloat(document.getElementById('cfgConf').value);
+
+      const tts_provider = document.getElementById('cfgTTSProvider').value;
+      const tts_language = document.getElementById('cfgSarvamLang').value;
+      const tts_rate = parseInt(document.getElementById('cfgRate').value);
+      const tts_volume = parseInt(document.getElementById('cfgVolume').value);
+      const auto_word = document.getElementById('cfgAutoWord').checked;
+      const auto_sentence = document.getElementById('cfgAutoSentence').checked;
+      const speak_letters = document.getElementById('cfgSpeakLetters').checked;
+
+      const cooldown_ms = parseInt(document.getElementById('cfgCooldown').value);
+      const release_ms = parseInt(document.getElementById('cfgRelease').value);
+      const draw_overlay = document.getElementById('cfgDrawOverlay').checked;
+      const show_fps = document.getElementById('cfgShowFps').checked;
+
+      const payload = {
+        inference_width, mirror, hold_ms, smoothing, min_vote_ratio, confidence,
+        tts_provider, tts_language, tts_rate, tts_volume, auto_word, auto_sentence, speak_letters,
+        cooldown_ms, release_ms, draw_overlay, show_fps
+      };
+
+      currentSettings = Object.assign({}, currentSettings, payload);
+
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const camPayload = { mode: chosenCamMode };
+      if (new5gIp) {
+        camPayload.host = new5gIp;
+        current5GHost = new5gIp;
+        const opt = document.getElementById('opt5g');
+        if (opt) opt.textContent = '📶 5G Modem (' + current5GHost + ':554)';
+        const quick = document.getElementById('lbl5GHostQuick');
+        if (quick) quick.textContent = current5GHost + ' (Dynamic RTSP :554)';
+      }
+      await fetch('/api/camera', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(camPayload)
+      });
+
+      showToast('Settings saved successfully');
+    }
+
+    async function resetDefaultSettings() {
+      if (!confirm('Reset all recognition, camera and speech settings to default values?')) return;
+      const defaults = {
+        inference_width: 800,
+        mirror: true,
+        hold_ms: 500,
+        smoothing: 8,
+        min_vote_ratio: 0.60,
+        confidence: 0.55,
+        tts_provider: 'sarvam',
+        tts_language: 'hi-IN',
+        tts_rate: 0,
+        tts_volume: 100,
+        auto_word: true,
+        auto_sentence: true,
+        speak_letters: false,
+        cooldown_ms: 200,
+        release_ms: 250,
+        draw_overlay: true,
+        show_fps: true
+      };
+
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(defaults)
+      });
+
+      await loadSettingsIntoForm();
+      showToast('Settings reset to defaults');
+    }
+
+    // ==================================================================
+    // TRAIN PAGE: Dataset, Recording, Training, Model Management
+    // ==================================================================
+    let currentSelectedLabel = "A";
+    let cachedDatasetInfo = null;
+    let isRecordingActive = false;
+    let recordPollTimer = null;
+    let isTrainingActive = false;
+    let trainOutcomeMsg = '';  // last training result, kept on screen
+    let trainPollTimer = null;
+
+    async function loadDataset() {
       try {
-        const res = await fetch("/api/dictionary");
+        const res = await fetch('/api/dataset');
+        if (!res.ok) return;
         const data = await res.json();
-        const grid = document.getElementById("dictCardsGrid");
-        grid.innerHTML = data.vocabulary.map(v => `
-          <div class="dict-card">
-            <div class="dict-char">${v.display}</div>
-            <div class="dict-hint">${v.hint}</div>
-          </div>
-        `).join("");
+        cachedDatasetInfo = data;
+
+        // Update dataset summary counter
+        const sumCount = document.getElementById('datasetSummaryCount');
+        if (sumCount) {
+          sumCount.textContent = `${data.total_samples} sample${data.total_samples === 1 ? '' : 's'} · ${data.total_signs} sign${data.total_signs === 1 ? '' : 's'}`;
+        }
+
+        // Training readiness check
+        const readySigns = data.labels.filter(l => l.count >= 5).length;
+        const canTrain = readySigns >= 2 && data.total_samples >= 20;
+        const btnTrHead = document.getElementById('btnTrainHeader');
+        const btnTrPers = document.getElementById('btnTrainPersonal');
+        const trStatus = document.getElementById('trainStatusText');
+        if (btnTrHead) btnTrHead.disabled = !canTrain || isTrainingActive;
+        if (btnTrPers) btnTrPers.disabled = !canTrain || isTrainingActive;
+        if (trStatus && !isTrainingActive) {
+          if (trainOutcomeMsg) {
+            // Keep the last training result visible until the dataset changes.
+            trStatus.textContent = trainOutcomeMsg;
+          } else if (canTrain) {
+            trStatus.textContent = `Ready to train on ${readySigns} signs and ${data.total_samples} samples.`;
+          } else {
+            trStatus.textContent = `Record at least two signs (5+ samples each) to start training.`;
+          }
+        }
+
+        // Render grid tiles
+        renderTiles(data.labels);
+
+        // Update Record Sign Card
+        updateRecordSignCard(data.labels);
+      } catch (err) {
+        console.error('loadDataset error:', err);
+      }
+    }
+
+    function renderTiles(labels) {
+      const grid = document.getElementById('tilesGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      labels.forEach(item => {
+        const tile = document.createElement('div');
+        tile.className = 'letter-tile' + (item.label === currentSelectedLabel ? ' active' : '');
+        tile.title = `${item.display} — ${item.hint || 'No hint available'}`;
+        tile.onclick = () => selectTrainSign(item.label);
+
+        // Text formatting
+        let displayTxt = item.display;
+        if (item.label === '__CONTROL__:BACKSPACE') {
+          displayTxt = 'DEL';
+        } else if (item.is_custom) {
+          displayTxt = item.display.length > 4 ? item.display.slice(0, 4) + '…' : item.display;
+        }
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'tile-label';
+        labelSpan.textContent = displayTxt;
+        if (displayTxt.length > 3) {
+          labelSpan.style.fontSize = '9px';
+        } else if (displayTxt.length > 1) {
+          labelSpan.style.fontSize = '11px';
+        }
+
+        const countSpan = document.createElement('span');
+        countSpan.className = 'tile-count' + (item.count >= 20 ? ' green' : '');
+        countSpan.textContent = item.count;
+
+        tile.appendChild(labelSpan);
+        tile.appendChild(countSpan);
+
+        // Tiny bottom progress line
+        if (item.count > 0) {
+          const barBg = document.createElement('div');
+          barBg.className = 'tile-bar-bg';
+          const fill = document.createElement('div');
+          fill.className = 'tile-bar-fill' + (item.count >= 20 ? ' green' : '');
+          fill.style.width = Math.min(100, Math.round((item.count / 20) * 100)) + '%';
+          barBg.appendChild(fill);
+          tile.appendChild(barBg);
+        }
+
+        grid.appendChild(tile);
+      });
+    }
+
+    function selectTrainSign(label) {
+      currentSelectedLabel = label;
+      if (cachedDatasetInfo && cachedDatasetInfo.labels) {
+        renderTiles(cachedDatasetInfo.labels);
+        updateRecordSignCard(cachedDatasetInfo.labels);
+      }
+    }
+
+    function updateRecordSignCard(labels) {
+      const item = labels.find(l => l.label === currentSelectedLabel) || labels[0];
+      if (!item) return;
+
+      currentSelectedLabel = item.label;
+
+      const bigLbl = document.getElementById('selectedTrainLabelBig');
+      if (bigLbl) {
+        bigLbl.textContent = item.display;
+        if (item.display.length === 1) {
+          bigLbl.style.fontSize = '44px';
+        } else if (item.display.length <= 4) {
+          bigLbl.style.fontSize = '26px';
+        } else {
+          bigLbl.style.fontSize = '18px';
+        }
+      }
+
+      const nameEl = document.getElementById('selectedTrainName');
+      if (nameEl) nameEl.textContent = `Sign ${item.display}`;
+
+      const countEl = document.getElementById('selectedTrainCounts');
+      if (countEl) countEl.textContent = `${item.count} samples · ${item.takes || 0} takes · target 30`;
+
+      const hintEl = document.getElementById('selectedTrainHint');
+      if (hintEl) {
+        if (item.label === '__CONTROL__:BACKSPACE') {
+          hintEl.textContent = 'Custom control handshape: deletes the last character or transcript token.';
+        } else if (item.is_custom) {
+          hintEl.textContent = 'Custom handshape: inserts this word or phrase with word spacing.';
+        } else {
+          hintEl.textContent = item.hint || 'No hint available';
+        }
+      }
+
+      const btnRemWord = document.getElementById('btnRemoveWord');
+      if (btnRemWord) {
+        btnRemWord.style.display = item.is_custom ? 'inline-flex' : 'none';
+        btnRemWord.disabled = isRecordingActive || isTrainingActive;
+      }
+    }
+
+    async function addCustomWordFromInput() {
+      const inp = document.getElementById('customWordInput');
+      const val = inp.value.trim();
+      if (!val) {
+        showToast('Please enter a word or phrase');
+        return;
+      }
+      try {
+        const res = await fetch('/api/dataset/add_word', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word: val })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          inp.value = '';
+          currentSelectedLabel = data.label;
+          showToast(`Added custom word: "${data.display}"`);
+          await loadDataset();
+        } else {
+          showToast(data.message || 'Error adding custom word');
+        }
+      } catch (e) {
+        showToast('Failed to add custom word');
+      }
+    }
+
+    async function removeCurrentCustomWord() {
+      if (!currentSelectedLabel || !currentSelectedLabel.startsWith('__WORD__:')) return;
+      if (!confirm('Remove this custom sign and all of its recorded examples?')) return;
+      try {
+        const res = await fetch('/api/dataset/remove_word', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label: currentSelectedLabel })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          currentSelectedLabel = 'A';
+          showToast('Custom sign removed');
+          await loadDataset();
+        }
+      } catch (e) {
+        showToast('Failed to remove custom sign');
+      }
+    }
+
+    async function clearCurrentSign() {
+      if (!confirm(`Clear all recorded samples for "${currentSelectedLabel}"?`)) return;
+      try {
+        await fetch('/api/dataset/clear_label', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label: currentSelectedLabel })
+        });
+        showToast(`Cleared samples for sign`);
+        await loadDataset();
+      } catch (e) {
+        showToast('Failed to clear sign');
+      }
+    }
+
+    async function confirmClearDataset() {
+      if (!confirm('Are you sure you want to delete all recorded samples in your dataset? This cannot be undone.')) return;
+      try {
+        await fetch('/api/dataset/clear_all', { method: 'POST' });
+        showToast('All dataset samples cleared');
+        await loadDataset();
+      } catch (e) {
+        showToast('Failed to clear dataset');
+      }
+    }
+
+    // Recording Controls
+    async function startSignRecording() {
+      if (isRecordingActive) return;
+      const duration = parseFloat(document.getElementById('trainDurationSelect').value) || 3.0;
+      const delay = parseFloat(document.getElementById('trainDelaySelect').value) || 0.0;
+
+      try {
+        const res = await fetch('/api/record/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label: currentSelectedLabel, duration, delay })
+        });
+        if (!res.ok) return;
+
+        isRecordingActive = true;
+        document.getElementById('btnRecordSign').disabled = true;
+        document.getElementById('btnCancelRecord').style.display = 'inline-flex';
+        document.getElementById('recordProgressWrap').style.display = 'flex';
+        document.getElementById('recordProgressBar').style.width = '0%';
+        document.getElementById('trainDurationSelect').disabled = true;
+        document.getElementById('trainDelaySelect').disabled = true;
+
+        const statText = document.getElementById('recordStatusText');
+        if (delay > 0) {
+          document.getElementById('btnRecordSignText').textContent = 'Get ready…';
+          statText.textContent = `Starting in ${delay.toFixed(0)} sec. Get both hands into frame.`;
+        } else {
+          document.getElementById('btnRecordSignText').textContent = 'Recording…';
+          statText.textContent = 'Hold this sign steady. Vary hand position between separate takes.';
+        }
+
+        // Poll recording state
+        if (recordPollTimer) clearInterval(recordPollTimer);
+        recordPollTimer = setInterval(pollRecordState, 150);
       } catch (e) {
         console.error(e);
       }
     }
 
-    async function saveSettings() {
-      const source = document.getElementById("settingCamSource").value.trim();
-      const hold_ms = parseInt(document.getElementById("settingHoldMs").value);
-      const confidence = parseFloat(document.getElementById("settingConf").value);
-      const mirror = document.getElementById("settingMirror").checked;
-      const model = document.getElementById("settingModelSelect").value;
+    async function pollRecordState() {
+      try {
+        const res = await fetch('/api/record/status');
+        if (!res.ok) return;
+        const d = await res.json();
 
-      await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hold_ms, confidence, mirror, camera_source: source })
-      });
+        if (d.countdown > 0) {
+          document.getElementById('btnRecordSignText').textContent = `Get ready · ${d.countdown}`;
+          document.getElementById('recordStatusText').textContent = `Recording ${d.display} in ${d.countdown} sec. Place both hands in frame.`;
+        } else if (d.active) {
+          document.getElementById('btnRecordSignText').textContent = `Recording ${d.display}…`;
+          document.getElementById('recordStatusText').textContent = `Recording ${d.display} — ${d.samples_count} frames captured…`;
+          const duration = parseFloat(document.getElementById('trainDurationSelect').value) || 3.0;
+          const targetFrames = Math.max(10, Math.round(duration / 0.18));
+          const pct = Math.min(100, Math.round((d.samples_count / targetFrames) * 100));
+          document.getElementById('recordProgressBar').style.width = pct + '%';
+        }
 
-      await fetch("/api/model", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: model })
-      });
+        if (!d.recording) {
+          // Recording completed or cancelled
+          clearInterval(recordPollTimer);
+          recordPollTimer = null;
+          isRecordingActive = false;
 
-      if (source) {
-        await fetch("/api/camera", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source })
-        });
+          document.getElementById('btnRecordSign').disabled = false;
+          document.getElementById('btnRecordSignText').textContent = 'Record sign';
+          document.getElementById('btnCancelRecord').style.display = 'none';
+          document.getElementById('recordProgressWrap').style.display = 'none';
+          document.getElementById('trainDurationSelect').disabled = false;
+          document.getElementById('trainDelaySelect').disabled = false;
+
+          if (d.finished_notice) {
+            if (d.finished_notice.startsWith('Saved')) trainOutcomeMsg = '';  // dataset changed
+            document.getElementById('recordStatusText').textContent = d.finished_notice;
+            showToast(d.finished_notice);
+          } else {
+            document.getElementById('recordStatusText').textContent = 'Recording finished.';
+          }
+          await loadDataset();
+        }
+      } catch (e) {
+        console.error(e);
       }
-
-      closeModal("settingsModal");
     }
 
-    // Start status polling
+    async function cancelSignRecording() {
+      try {
+        await fetch('/api/record/cancel', { method: 'POST' });
+        if (recordPollTimer) {
+          clearInterval(recordPollTimer);
+          recordPollTimer = null;
+        }
+        isRecordingActive = false;
+        document.getElementById('btnRecordSign').disabled = false;
+        document.getElementById('btnRecordSignText').textContent = 'Record sign';
+        document.getElementById('btnCancelRecord').style.display = 'none';
+        document.getElementById('recordProgressWrap').style.display = 'none';
+        document.getElementById('trainDurationSelect').disabled = false;
+        document.getElementById('trainDelaySelect').disabled = false;
+        document.getElementById('recordStatusText').textContent = 'Recording cancelled.';
+        showToast('Recording cancelled');
+        await loadDataset();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Model Training
+    async function requestTraining() {
+      if (isTrainingActive) return;
+      trainOutcomeMsg = '';
+      try {
+        const res = await fetch('/api/train', { method: 'POST' });
+        if (!res.ok) {
+          const d = await res.json();
+          showToast(d.message || 'Cannot start training');
+          return;
+        }
+        isTrainingActive = true;
+        document.getElementById('btnTrainHeader').disabled = true;
+        document.getElementById('btnTrainPersonal').disabled = true;
+        document.getElementById('trainProgressWrap').style.display = 'flex';
+        document.getElementById('trainProgressBar').style.width = '0%';
+        document.getElementById('trainStatusText').textContent = 'Preparing dataset and training models…';
+
+        if (trainPollTimer) clearInterval(trainPollTimer);
+        trainPollTimer = setInterval(pollTrainingState, 350);
+      } catch (e) {
+        showToast('Error requesting training');
+      }
+    }
+
+    async function pollTrainingState() {
+      try {
+        const res = await fetch('/api/train/status');
+        if (!res.ok) return;
+        const d = await res.json();
+
+        if (d.training) {
+          document.getElementById('trainProgressBar').style.width = Math.max(0, Math.min(100, d.progress)) + '%';
+          document.getElementById('trainStatusText').textContent = d.message || 'Training in progress…';
+        } else {
+          clearInterval(trainPollTimer);
+          trainPollTimer = null;
+          isTrainingActive = false;
+          document.getElementById('btnTrainHeader').disabled = false;
+          document.getElementById('btnTrainPersonal').disabled = false;
+
+          if (d.error) {
+            trainOutcomeMsg = 'Training failed: ' + d.error;
+            document.getElementById('trainStatusText').textContent = trainOutcomeMsg;
+            showToast(trainOutcomeMsg);
+          } else if (d.result) {
+            document.getElementById('trainProgressBar').style.width = '100%';
+            const acc = (d.result.accuracy * 100).toFixed(1);
+            trainOutcomeMsg = `Done — ${d.result.algorithm}: ${acc}% accuracy on ${d.result.classes} signs ` +
+              `(${d.result.samples} samples). The new model is active now.`;
+            document.getElementById('trainStatusText').textContent = trainOutcomeMsg;
+            showToast(`Model trained successfully — ${acc}% accuracy`);
+            await loadDataset();
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Personal model upload
+    async function uploadModelFile(input) {
+      if (!input.files || !input.files[0]) return;
+      const file = input.files[0];
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch('/api/model/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const d = await res.json();
+        if (d.status === 'ok') {
+          showToast(d.message || 'Model uploaded and activated!');
+        } else {
+          showToast(d.message || 'Error uploading model');
+        }
+      } catch (e) {
+        showToast('Upload failed');
+      } finally {
+        input.value = '';
+      }
+    }
+
+    // Voice phrase recording and transcription via Sarvam Saaras AI
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecordingVoice = false;
+
+    async function toggleVoiceForCustomWord() {
+      const btn = document.getElementById('btnVoiceCustomWord');
+
+      if (isRecordingVoice) {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+        return;
+      }
+
+      // 1. Try audio recording via MediaRecorder -> Sarvam Saaras AI
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioChunks = [];
+          mediaRecorder = new MediaRecorder(stream);
+
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunks.push(e.data);
+          };
+
+          mediaRecorder.onstop = async () => {
+            stream.getTracks().forEach(track => track.stop());
+            isRecordingVoice = false;
+            btn.textContent = 'Transcribing…';
+            btn.classList.remove('active');
+
+            const blob = new Blob(audioChunks, { type: 'audio/wav' });
+            const formData = new FormData();
+            formData.append('file', blob, 'phrase.wav');
+
+            showToast('Transcribing audio via Sarvam Saaras AI…');
+            try {
+              const res = await fetch('/api/stt/transcribe', {
+                method: 'POST',
+                body: formData
+              });
+              const data = await res.json();
+              if (data.status === 'ok' && data.transcript) {
+                document.getElementById('customWordInput').value = data.transcript;
+                showToast(`Sarvam transcribed: "${data.transcript}" (${data.language_code || 'detected'})`);
+              } else {
+                showToast(data.message || 'Sarvam did not detect speech. Try again.');
+              }
+            } catch (err) {
+              console.error(err);
+              showToast('Sarvam transcription request failed');
+            } finally {
+              btn.textContent = '🎤 Record phrase';
+            }
+          };
+
+          mediaRecorder.start();
+          isRecordingVoice = true;
+          btn.textContent = '⏹ Stop recording';
+          btn.classList.add('active');
+          showToast('Recording phrase for Sarvam Saaras AI… Speak clearly');
+          return;
+        } catch (err) {
+          console.warn('Microphone access for MediaRecorder unavailable, falling back to Web Speech API:', err);
+        }
+      }
+
+      // 2. Fallback to Web Speech API if MediaRecorder is unavailable
+      fallbackSpeechRecognition(btn);
+    }
+
+    function fallbackSpeechRecognition(btn) {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        showToast('Microphone recording not supported in this browser. Please type the word.');
+        return;
+      }
+
+      const rec = new SpeechRec();
+      rec.lang = currentSettings.tts_language || 'en-US';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+
+      rec.onstart = () => {
+        btn.textContent = '🔴 Listening…';
+        btn.classList.add('active');
+      };
+
+      rec.onresult = (ev) => {
+        const transcript = ev.results[0][0].transcript;
+        if (transcript) {
+          document.getElementById('customWordInput').value = transcript.trim();
+          showToast(`Transcribed: "${transcript.trim()}"`);
+        }
+      };
+
+      rec.onerror = (ev) => {
+        showToast('Voice error: ' + ev.error);
+      };
+
+      rec.onend = () => {
+        btn.textContent = '🎤 Record phrase';
+        btn.classList.remove('active');
+      };
+
+      rec.start();
+    }
+
+    // Start live status polling & load initial dataset
+    loadDataset();
     pollStatus();
   </script>
 </body>
 </html>
-

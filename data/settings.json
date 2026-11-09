@@ -14,11 +14,11 @@
   "auto_sentence": true,
   "speak_letters": false,
   "tts_voice": "",
-  "tts_provider": "local",
-  "tts_language": "hi-IN",
+  "tts_provider": "sarvam",
+  "tts_language": "en-IN",
   "tts_rate": 0,
   "tts_volume": 100,
   "draw_overlay": true,
   "show_fps": true,
-  "active_model": "legacy"
+  "active_model": "user"
 }

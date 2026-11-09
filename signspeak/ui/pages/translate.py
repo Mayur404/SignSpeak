@@ -66,7 +66,7 @@ class TranslatePage(QWidget):
             "Live translate",
             "Sign naturally. Your handshapes become text, ready to edit or speak.",
         )
-        self.model_pill = Pill("Bundled model", "violet")
+        self.model_pill = Pill("PERSONAL MODEL", "green")
         self.camera_pill = Pill("STARTING", "amber")
         self.header.add_action(self.model_pill)
         self.header.add_action(self.camera_pill)
@@ -128,7 +128,7 @@ class TranslatePage(QWidget):
         hint_row.addWidget(hint_icon)
         hint = QLabel(
             "Keep your hand in frame and change signs directly—no need to move out of view. "
-            "Thumbs up finishes a word · “I love you” finishes a sentence."
+            "Thumbs up finishes a word · Period sign finishes a sentence."
         )
         hint.setObjectName("Muted")
         hint.setWordWrap(True)
@@ -366,7 +366,8 @@ class TranslatePage(QWidget):
                 f"{info.name} — {info.algorithm}\n{info.samples or 0} samples"
             )
         else:
-            self.model_pill.set_status("BUNDLED MODEL", "violet")
+            self.model_pill.set_status("MODEL ERROR", "red")
+            self.model_pill.setToolTip("Personal model unavailable. Check the Train page for status.")
             self.model_pill.setToolTip(
                 "Pre-trained on the reference dataset. Train a personal model in "
                 "“Train” for much higher accuracy with your own hand."

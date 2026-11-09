@@ -24,9 +24,9 @@ directly through their own device's speakers.
 - Renders a real-time HUD directly on the video feed: dual-hand skeletons with colored bone links,
   joint highlights, corner framing brackets, confidence badge, and a circular hold-to-type countdown ring.
 - Navigation & control gestures:
-  - **Thumbs Up (`👍`)**: Commits Space, finishes current word, and triggers word-level speech synthesis.
-  - **I Love You (`🤟`)**: Commits Period (`.`), finishes sentence, and triggers full sentence speech.
-  - **Open Palm Wave (`✋`)**: Backspace (deletes previous letter).
+  - **Space Gesture**: Commits Space, finishes current word, and triggers word-level speech synthesis.
+  - **Period Gesture**: Commits Period (`.`), finishes sentence, and triggers full sentence speech.
+  - **Backspace Gesture**: Deletes previous letter from word buffer.
 - Built-in Browser Speech Synthesis (Web Speech API): Plays audio directly on your phone or laptop speakers
   with zero latency and natural voice selection without needing audio drivers on the server.
 - One-click camera switcher: Switch seamlessly between the **5G RTSP stream** (`10.101.0.70`), **Direct Ethernet RTSP**
@@ -43,11 +43,11 @@ directly through their own device's speakers.
 | `stop.sh` | Stops the background program cleanly. |
 | `run.sh` | Starts the program in the foreground (Linux / Mac). |
 | `run.bat` | One-click Windows starter. |
-| `signmodel.joblib` | The 35-class Extra Trees model (17.6 MB, 99.4% accuracy). |
+| `signmodel.joblib` | Personal classifier used when the data-folder model has not been created yet. |
 | `signspeak/web/` | Web application: MJPEG video streamer, REST API, modern HTML5/JS dashboard. |
 | `signspeak/` | Core Python engine: vision pipeline, hand tracking, recognition, composer. |
-| `assets/models/` | MediaPipe hand landmarker (`hand_landmarker.task`) and bundled legacy model. |
-| `data/` | User settings (`settings.json`), trained model (`user_model.joblib`), recordings. |
+| `assets/models/` | MediaPipe hand landmarker (`hand_landmarker.task`) and legacy model compatibility asset. |
+| `data/` | User settings (`settings.json`), active personal model (`user_model.joblib`), recordings. |
 | `.env` / `.env.example` | Network settings: camera IP (`CAMERA_HOST`) and web port (`8080`). |
 | `requirements.txt` | Python dependencies (Flask, OpenCV, MediaPipe, scikit-learn, numpy). |
 | `tests/` | Automated unit test suite (`test_core.py`, `test_web.py`). |
@@ -101,20 +101,23 @@ cd ~/5Gusecase/SignSpeak
 ```
 
 ### 2. Start the program in the background
+On a fresh VM:
 ```bash
-./start.sh
+git clone https://github.com/Mayur404/SignSpeak.git && cd SignSpeak
+./setup_ubuntu.sh   # one time: installs packages, asks for the camera IP and Sarvam API key
+./start.sh          # runs in the background
 ```
-You will see:
-```text
-==========================================================
-  SignSpeak Web UI is running in background (PID: 12345)
-==========================================================
-  * Local browser:    http://localhost:8080
-  * 5G Edge Server:   http://172.16.0.11:8080
-  * View live logs:   tail -f signspeak.log
-  * Stop server:      ./stop.sh
-==========================================================
-```
+`setup_ubuntu.sh` installs the system libraries and a Python 3.9–3.12 virtualenv, creates `.env`
+(git-ignored) and checks that the app imports correctly. `start.sh` also works straight after cloning:
+it runs the setup itself on first use, opens port 8080 in `ufw` if it can, and connects to the RTSP
+camera at `CAMERA_HOST` (default `10.101.0.74`).
+
+- **Camera IP changed?** Edit `CAMERA_HOST` in `.env` (or set it from the dashboard), then `./stop.sh && ./start.sh`.
+- **Speech:** pick the language in *Settings → Speech Language*. English is spoken by the browser's
+  Microsoft voice; Hindi, Tamil, Telugu and the other Indian languages are spoken by Sarvam
+  (needs `SARVAM_API_KEY` in `.env`). Use Edge or Chrome on Windows to open the dashboard.
+
+The script prints the URLs to open from your PC, e.g. `http://172.16.0.11:8080`.
 
 ### 3. Open the Dashboard
 Connect your laptop or phone to the lab Wi-Fi, open your browser, and navigate to:
@@ -204,9 +207,9 @@ If the 5G modem is turned off and the camera is plugged directly into a laptop's
 |---|---|---|
 | **A – Z** | Letter typing | Hold hand shape steady for 0.5s to type character. |
 | **0 – 9** | Digit typing | Static handshapes for numbers. |
-| **Thumbs Up (`👍`)** | Space (` `) | Finishes current word and triggers word speech. |
-| **I Love You (`🤟`)** | Period (`.`) | Finishes sentence and triggers full sentence speech. |
-| **Open Palm Wave (`✋`)** | Backspace | Deletes the previous character from word buffer. |
+| **Space Gesture** | Space (` `) | Finishes current word and triggers word speech. |
+| **Period Gesture** | Period (`.`) | Finishes sentence and triggers full sentence speech. |
+| **Backspace Gesture** | Backspace | Deletes the previous character from word buffer. |
 
 ---
 
@@ -222,7 +225,7 @@ The web backend exposes a clean JSON and streaming REST API:
 | `/api/action` | `POST` | Trigger action: `{"action": "space" \| "period" \| "backspace" \| "clear" \| "type", "param": "A"}`. |
 | `/api/camera` | `POST` | Switch camera: `{"preset": "5g" \| "ethernet" \| "webcam"}` or `{"source": "<RTSP_URL>"}`. |
 | `/api/settings` | `POST` | Live settings update: `{"hold_ms": 500, "confidence": 0.55, "mirror": true}`. |
-| `/api/model` | `POST` | Switch model: `{"kind": "user" \| "legacy"}`. |
+| `/api/model` | `POST` | Activate the personal model: `{"kind": "user"}`. |
 | `/api/dictionary`| `GET` | Full dictionary of ASL handshapes and descriptive hints. |
 | `/api/system` | `GET` | Network configuration, edge server info, and IP lookup helper. |
 

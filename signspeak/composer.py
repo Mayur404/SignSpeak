@@ -80,6 +80,13 @@ class TextComposer:
         if len(label) == 1:
             self.word += label
             return CommitResult("letter", self.word, self.transcript)
+        word = label.strip()
+        if word:
+            if self.word:
+                self.tokens.append(self.word)
+                self.word = ""
+            self.tokens.append(word)
+            return CommitResult("word", self.word, self.transcript, speak_word=word)
         return CommitResult("letter", self.word, self.transcript, changed=False)
 
     def space(self) -> CommitResult:

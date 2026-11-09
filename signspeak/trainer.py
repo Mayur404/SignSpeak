@@ -366,3 +366,44 @@ def train_model(
         validation_method=validation_method,
         balanced_accuracy=best_balanced,
     )
+
+
+def _lower_process_priority() -> None:
+    """Keep the live camera/recognition process ahead of training."""
+    try:
+        import os
+        import sys
+        if sys.platform == "win32":
+            import ctypes
+            BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
+            handle = ctypes.windll.kernel32.GetCurrentProcess()
+            ctypes.windll.kernel32.SetPriorityClass(handle, BELOW_NORMAL_PRIORITY_CLASS)
+        else:
+            os.nice(10)
+    except Exception:
+        pass
+
+
+def train_in_subprocess(X, y, groups, queue, model_path=None) -> None:
+    """Run train_model in a child process, reporting through ``queue``.
+
+    Messages: ("progress", message, percent), ("done", result_dict) or
+    ("error", message). Running here instead of in a thread keeps model
+    fitting from holding the main process's GIL, so live recognition keeps
+    running at full speed while a model trains.
+    """
+    _lower_process_priority()
+    try:
+        def progress(message: str, percent: int) -> None:
+            queue.put(("progress", str(message), int(percent)))
+
+        res = train_model(X, y, progress=progress, groups=groups,
+                          model_path=Path(model_path) if model_path else USER_MODEL)
+        queue.put(("done", {
+            "accuracy": float(res.accuracy),
+            "algorithm": str(res.algorithm),
+            "samples": int(res.samples),
+            "classes": int(res.classes),
+        }))
+    except Exception as exc:  # report every failure to the parent
+        queue.put(("error", str(exc) or exc.__class__.__name__))

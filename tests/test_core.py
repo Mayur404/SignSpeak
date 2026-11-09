@@ -240,6 +240,10 @@ class DatasetTests(unittest.TestCase):
 
 
 class SettingsTests(unittest.TestCase):
+    def test_personal_classifier_is_default_and_migrates_legacy_settings(self):
+        self.assertEqual(Settings().active_model, "user")
+        self.assertEqual(Settings(active_model="legacy").sanitized().active_model, "user")
+
     def test_settings_camera_source_persistence(self):
         settings = Settings(camera_source="rtsp://admin:admin123@192.168.128.10:554/h264/ch1/sub/av_stream")
         self.assertIn("rtsp://", settings.camera_source)

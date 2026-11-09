@@ -74,7 +74,6 @@ class TrainPage(QWidget):
     capture_delay_changed = Signal(float)
     cancel_recording = Signal()
     train_requested = Signal()
-    activate_model = Signal(str)
     save_model = Signal()
     load_model = Signal()
     remove_word_requested = Signal(str)
@@ -92,8 +91,6 @@ class TrainPage(QWidget):
         self._recording = False
         self._training = False
         self._camera_live = False
-        self._has_personal = False
-        self._active_kind = "legacy"
         self._training_thread: TrainingThread | None = None
 
         root = QVBoxLayout(self)
@@ -104,7 +101,7 @@ class TrainPage(QWidget):
             "Train your model",
             "Build a recognizer around your hands. Record separate takes with small changes in position and distance.",
         )
-        self.model_pill = Pill("BUNDLED MODEL", "violet")
+        self.model_pill = Pill("PERSONAL MODEL", "green")
         self.header.add_action(self.model_pill)
         self.header_train_button = QPushButton("Train model")
         self.header_train_button.setObjectName("Primary")
@@ -332,13 +329,13 @@ class TrainPage(QWidget):
         model_header = QHBoxLayout()
         model_header.addWidget(self._section("Model in use"))
         model_header.addStretch(1)
-        self.active_pill = Pill("BUNDLED", "violet")
+        self.active_pill = Pill("PERSONAL", "green")
         model_header.addWidget(self.active_pill)
         model_card.body.addLayout(model_header)
-        self.model_name = QLabel("Bundled ASL model")
+        self.model_name = QLabel("Your personal model")
         self.model_name.setObjectName("H2")
         model_card.body.addWidget(self.model_name)
-        self.model_detail = QLabel("Pre-trained · 38 signs")
+        self.model_detail = QLabel("Personal sign recognition")
         self.model_detail.setObjectName("Muted")
         self.model_detail.setWordWrap(True)
         model_card.body.addWidget(self.model_detail)
@@ -347,12 +344,6 @@ class TrainPage(QWidget):
             f"font-size: 24px; font-weight: 800; color: {theme.GREEN};"
         )
         model_card.body.addWidget(self.model_accuracy)
-        button_row = QHBoxLayout()
-        self.use_personal = QPushButton("Use personal")
-        self.use_personal.setObjectName("Primary")
-        self.use_personal.clicked.connect(lambda: self.activate_model.emit("user"))
-        button_row.addWidget(self.use_personal)
-        model_card.body.addLayout(button_row)
         snapshot_row = QHBoxLayout()
         self.save_model_button = QPushButton("Save a copy…")
         self.save_model_button.setObjectName("Ghost")
@@ -374,7 +365,7 @@ class TrainPage(QWidget):
 
         self._refresh()
         self.set_model_info(
-            ModelInfo("legacy", "Bundled ASL model", "legacy42", "Random Forest"), False, "legacy"
+            ModelInfo("user", "Your personal model", "rich126", "Personal classifier"), False
         )
 
     # ------------------------------------------------------------------
@@ -652,15 +643,9 @@ class TrainPage(QWidget):
         self.record_status.setText("Recording cancelled.")
         self._refresh()
 
-    def set_model_info(self, info: ModelInfo, has_personal: bool, active_kind: str) -> None:
-        self._has_personal = has_personal
-        self._active_kind = active_kind
-        if active_kind == "user":
-            self.model_pill.set_status("PERSONAL MODEL", "green")
-            self.active_pill.set_status("PERSONAL", "green")
-        else:
-            self.model_pill.set_status("BUNDLED MODEL", "violet")
-            self.active_pill.set_status("BUNDLED", "violet")
+    def set_model_info(self, info: ModelInfo, has_personal: bool) -> None:
+        self.model_pill.set_status("PERSONAL MODEL", "green")
+        self.active_pill.set_status("PERSONAL", "green")
         self.model_name.setText(info.name)
         parts = [info.algorithm]
         if info.classes:
@@ -675,22 +660,8 @@ class TrainPage(QWidget):
             self.model_accuracy.setText("Needs validation on separate recording takes")
         else:
             self.model_accuracy.setText("")
-        self.use_personal.setEnabled(has_personal and active_kind != "user")
         self.save_model_button.setEnabled(has_personal)
         self.load_model_button.setEnabled(True)
-        if has_personal:
-            self.use_personal.setObjectName(
-                "Primary" if active_kind != "user" else "Ghost"
-            )
-        else:
-            self.use_personal.setObjectName("Ghost")
-        self.use_personal.style().unpolish(self.use_personal)
-        self.use_personal.style().polish(self.use_personal)
-
-    def set_model_switching(self, switching: bool) -> None:
-        self.use_personal.setEnabled(
-            not switching and self._has_personal and self._active_kind != "user"
-        )
 
     # ---- events -------------------------------------------------------
     def _start_recording(self) -> None:

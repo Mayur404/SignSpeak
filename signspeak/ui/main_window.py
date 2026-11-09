@@ -40,8 +40,6 @@ from ..speech_input import TranscriptionThread
 from ..recognition import (
     ModelLoadError,
     RecognitionEngine,
-    load_classifier,
-    load_legacy_classifier,
     load_user_classifier,
 )
 from ..trainer import DatasetStore, TrainingResult
@@ -143,18 +141,8 @@ class MainWindow(QMainWindow):
     # Construction
     # ------------------------------------------------------------------
     def _load_initial_classifier(self):
-        kind = self.settings.active_model
-        try:
-            return load_classifier(kind)
-        except ModelLoadError:
-            if kind != "legacy":
-                try:
-                    classifier = load_legacy_classifier()
-                    self.settings.active_model = "legacy"
-                    return classifier
-                except ModelLoadError:
-                    pass
-            raise
+        self.settings.active_model = "user"
+        return load_user_classifier()
 
     def _build_ui(self) -> None:
         central = QWidget()
@@ -321,7 +309,6 @@ class MainWindow(QMainWindow):
             lambda value: self.update_setting("capture_delay", value)
         )
         train.train_requested.connect(self.start_training)
-        train.activate_model.connect(self.activate_model)
         train.save_model.connect(self.save_model_copy)
         train.load_model.connect(self.load_model_copy)
         train.remove_word_requested.connect(self.remove_custom_word)
@@ -830,29 +817,6 @@ class MainWindow(QMainWindow):
             self._training_thread.deleteLater()
             self._training_thread = None
 
-    def activate_model(self, kind: str) -> None:
-        if kind == "user" and not USER_MODEL.exists():
-            self.show_toast("Train a personal model first.", "info")
-            return
-        if kind == self.classifier.info.kind:
-            self._update_model_ui()
-            return
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            classifier = load_classifier(kind)
-        except ModelLoadError as exc:
-            self.show_toast(str(exc), "error", 5000)
-            return
-        finally:
-            QApplication.restoreOverrideCursor()
-        self.classifier = classifier
-        self.settings.active_model = classifier.info.kind
-        self._save_settings()
-        if self.worker is not None:
-            self.worker.set_engine(RecognitionEngine(classifier, self.settings))
-        self._update_model_ui()
-        self.show_toast(f"Now using {classifier.info.name}.", "success", 2600)
-
     def save_model_copy(self) -> None:
         if not USER_MODEL.exists():
             self.show_toast("Train a personal model before saving a copy.", "info")
@@ -908,13 +872,13 @@ class MainWindow(QMainWindow):
         info = self.classifier.info
         has_personal = USER_MODEL.exists()
         self.translate_page.set_model_info(info)
-        self.train_page.set_model_info(info, has_personal, info.kind)
+        self.train_page.set_model_info(info, has_personal)
         self.settings_page.set_model_info(info, info.kind)
         if info.is_personal:
             accuracy = f" {info.balanced_accuracy * 100:.0f}%" if info.has_take_validation else ""
             self._set_side(self.side_model, f"Personal{accuracy}", theme.GREEN)
         else:
-            self._set_side(self.side_model, "Bundled", theme.VIOLET)
+            self._set_side(self.side_model, "Personal model error", theme.RED)
 
     def clear_label_data(self, label: str) -> None:
         count = self.store.counts().get(label, 0)
@@ -1015,21 +979,12 @@ class MainWindow(QMainWindow):
             )
         if key == "show_fps" and not self.settings.show_fps:
             self.translate_page.set_fps(0)
-        if key == "draw_overlay" and not self.settings.draw_overlay:
-            pass
         if self.worker is not None:
             self.worker.apply_settings(self.settings)
 
     def reset_defaults(self) -> None:
         previous_camera = (self.settings.camera_source, self.settings.camera_index)
-        preferred_model = "legacy"
-        if USER_MODEL.exists():
-            try:
-                load_user_classifier()
-            except ModelLoadError:
-                pass
-            else:
-                preferred_model = "user"
+        preferred_model = "user"
         self.settings = Settings(active_model=preferred_model)
         camera_changed = previous_camera != (
             self.settings.camera_source,
@@ -1049,10 +1004,7 @@ class MainWindow(QMainWindow):
             )
         if self.worker is not None and not camera_changed:
             self.worker.apply_settings(self.settings)
-        if self.classifier.info.kind != preferred_model:
-            self.activate_model(preferred_model)
-        else:
-            self._update_model_ui()
+        self._update_model_ui()
         if camera_changed and self._start_camera_when_ready:
             self.restart_camera()
         self.show_toast("Optimal settings restored.", "success", 2600)

@@ -17,8 +17,18 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
 
 import cv2
 import numpy as np
-from PySide6.QtCore import QThread, Signal
-from PySide6.QtGui import QImage
+try:  # Qt is only needed by the desktop GUI; the web server runs without it.
+    from PySide6.QtCore import QThread, Signal
+    from PySide6.QtGui import QImage
+except Exception:  # pragma: no cover - headless VM without Qt libraries
+    QImage = None
+
+    class QThread:  # type: ignore[no-redef]
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("PySide6 is required for the desktop GUI.")
+
+    def Signal(*args, **kwargs):  # type: ignore[no-redef]
+        return None
 
 from .config import Settings
 from .features import as_points, dual_hand_features
@@ -93,7 +103,7 @@ WHITE = (245, 248, 252)
 DARK = (8, 12, 20)
 GREEN = (153, 211, 52)       # #34D399 in BGR
 
-SPARSH_HOST = os.environ.get("CAMERA_HOST") or "192.168.128.10"
+SPARSH_HOST = os.environ.get("CAMERA_HOST") or "10.101.0.74"
 SPARSH_PORT = 554
 SPARSH_STREAM_PATHS = {
     "sub": (
@@ -192,25 +202,57 @@ _KNOWN_MEDIAPIPE_DIAGNOSTICS = (
 
 @contextmanager
 def _quiet_known_mediapipe_diagnostics():
-    """Hide known benign native diagnostics while preserving other stderr."""
-    # MediaPipe/TFLite write directly to the process stderr file descriptor.
-    # Limit the process-wide redirection to model initialization and the first
-    # inference, and replay every captured line except the known diagnostics.
+    """Hide known benign native diagnostics while preserving other stderr.
+
+    Purely cosmetic and strictly best-effort: when the process has no usable
+    stderr handle (pythonw, a detached/background launch, some IDE runners)
+    the fd juggling raises ``OSError: [WinError 6] The handle is invalid``.
+    In that case MediaPipe simply initialises without the filter.
+    """
     with _MEDIAPIPE_LOG_LOCK:
-        sys.stderr.flush()
-        original_stderr = os.dup(2)
-        with tempfile.TemporaryFile() as captured:
+        original_stderr = None
+        captured = None
+        redirected = False
+        try:
             try:
-                os.dup2(captured.fileno(), 2)
-                yield
-            finally:
                 sys.stderr.flush()
-                os.dup2(original_stderr, 2)
-                os.close(original_stderr)
-                captured.seek(0)
-                for line in captured:
-                    if not any(token in line for token in _KNOWN_MEDIAPIPE_DIAGNOSTICS):
-                        os.write(2, line)
+            except Exception:
+                pass
+            original_stderr = os.dup(2)
+            captured = tempfile.TemporaryFile()
+            os.dup2(captured.fileno(), 2)
+            redirected = True
+        except Exception:
+            redirected = False
+
+        try:
+            yield
+        finally:
+            if redirected:
+                try:
+                    try:
+                        sys.stderr.flush()
+                    except Exception:
+                        pass
+                    os.dup2(original_stderr, 2)
+                    captured.seek(0)
+                    for line in captured:
+                        if not any(token in line for token in _KNOWN_MEDIAPIPE_DIAGNOSTICS):
+                            try:
+                                os.write(2, line)
+                            except OSError:
+                                break
+                except Exception:
+                    pass
+            for closer in (
+                (lambda: os.close(original_stderr)) if original_stderr is not None else None,
+                captured.close if captured is not None else None,
+            ):
+                if closer is not None:
+                    try:
+                        closer()
+                    except Exception:
+                        pass
 
 
 @dataclass
@@ -221,18 +263,47 @@ class Observation:
 
 
 def _rounded_rect(image, p1, p2, color, radius=12, thickness=-1, alpha=1.0):
-    x1, y1 = p1
-    x2, y2 = p2
-    if alpha >= 0.999:
-        cv2.rectangle(image, (x1 + radius, y1), (x2 - radius, y2), color, thickness, cv2.LINE_AA)
-        cv2.rectangle(image, (x1, y1 + radius), (x2, y2 - radius), color, thickness, cv2.LINE_AA)
-        for cx, cy in ((x1 + radius, y1 + radius), (x2 - radius, y1 + radius),
-                       (x1 + radius, y2 - radius), (x2 - radius, y2 - radius)):
-            cv2.circle(image, (cx, cy), radius, color, thickness, cv2.LINE_AA)
+    """Draw a clean rounded rectangle (filled when thickness < 0, else outline).
+
+    The outline is built from 4 edges + 4 corner arcs, so nothing is drawn
+    inside the box. Alpha blending only touches the box's own region.
+    """
+    x1, y1 = int(min(p1[0], p2[0])), int(min(p1[1], p2[1]))
+    x2, y2 = int(max(p1[0], p2[0])), int(max(p1[1], p2[1]))
+    h_img, w_img = image.shape[:2]
+    if x2 <= x1 or y2 <= y1:
         return
-    overlay = image.copy()
-    _rounded_rect(overlay, p1, p2, color, radius, thickness, 1.0)
-    cv2.addWeighted(overlay, alpha, image, 1.0 - alpha, 0, image)
+
+    if alpha < 0.999:
+        pad = max(2, int(thickness) if thickness > 0 else 0) + 2
+        rx1, ry1 = max(0, x1 - pad), max(0, y1 - pad)
+        rx2, ry2 = min(w_img, x2 + pad + 1), min(h_img, y2 + pad + 1)
+        if rx2 <= rx1 or ry2 <= ry1:
+            return
+        roi = image[ry1:ry2, rx1:rx2]
+        overlay = roi.copy()
+        _rounded_rect(overlay, (x1 - rx1, y1 - ry1), (x2 - rx1, y2 - ry1), color, radius, thickness, 1.0)
+        cv2.addWeighted(overlay, float(alpha), roi, 1.0 - float(alpha), 0, roi)
+        return
+
+    r = int(max(0, min(radius, (x2 - x1) // 2, (y2 - y1) // 2)))
+    if thickness < 0:
+        cv2.rectangle(image, (x1 + r, y1), (x2 - r, y2), color, -1, cv2.LINE_AA)
+        cv2.rectangle(image, (x1, y1 + r), (x2, y2 - r), color, -1, cv2.LINE_AA)
+        if r > 0:
+            for cx, cy in ((x1 + r, y1 + r), (x2 - r, y1 + r), (x1 + r, y2 - r), (x2 - r, y2 - r)):
+                cv2.circle(image, (cx, cy), r, color, -1, cv2.LINE_AA)
+        return
+
+    t = max(1, int(thickness))
+    cv2.line(image, (x1 + r, y1), (x2 - r, y1), color, t, cv2.LINE_AA)
+    cv2.line(image, (x1 + r, y2), (x2 - r, y2), color, t, cv2.LINE_AA)
+    cv2.line(image, (x1, y1 + r), (x1, y2 - r), color, t, cv2.LINE_AA)
+    cv2.line(image, (x2, y1 + r), (x2, y2 - r), color, t, cv2.LINE_AA)
+    if r > 0:
+        for (cx, cy), start in (((x1 + r, y1 + r), 180), ((x2 - r, y1 + r), 270),
+                                ((x2 - r, y2 - r), 0), ((x1 + r, y2 - r), 90)):
+            cv2.ellipse(image, (cx, cy), (r, r), 0, start, start + 90, color, t, cv2.LINE_AA)
 
 
 def _draw_overlay(frame, points, state: RecognitionState, mirror: bool, paused: bool = False):
@@ -321,7 +392,7 @@ class HandTracker:
                 "Re-download hand_landmarker.task into assets/models."
             )
         options = vision.HandLandmarkerOptions(
-            base_options=mp_python.BaseOptions(model_asset_path=str(LANDMARKER_MODEL)),
+            base_options=mp_python.BaseOptions(model_asset_buffer=LANDMARKER_MODEL.read_bytes()),
             running_mode=vision.RunningMode.VIDEO,
             num_hands=2,
             min_hand_detection_confidence=detection,
@@ -329,7 +400,13 @@ class HandTracker:
             min_tracking_confidence=tracking,
         )
         self._mp = mp
-        with _quiet_known_mediapipe_diagnostics():
+        try:
+            with _quiet_known_mediapipe_diagnostics():
+                self._detector = vision.HandLandmarker.create_from_options(options)
+        except Exception:
+            # Retry plainly: a transient OS/handle error must not leave the
+            # app without hand tracking.
+            time.sleep(0.3)
             self._detector = vision.HandLandmarker.create_from_options(options)
         self._lock = threading.Lock()
         self._last_timestamp = 0
@@ -346,7 +423,12 @@ class HandTracker:
             image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=rgb)
             if self._first_inference:
                 self._first_inference = False
-                with _quiet_known_mediapipe_diagnostics():
+                try:
+                    with _quiet_known_mediapipe_diagnostics():
+                        result = self._detector.detect_for_video(image, timestamp_ms)
+                except OSError:
+                    timestamp_ms += 1
+                    self._last_timestamp = timestamp_ms
                     result = self._detector.detect_for_video(image, timestamp_ms)
             else:
                 result = self._detector.detect_for_video(image, timestamp_ms)
@@ -402,13 +484,23 @@ def warm_tracker() -> None:
     ).start()
 
 
-def get_tracker() -> HandTracker:
-    warm_tracker()
-    _TRACKER_READY.wait()
-    with _TRACKER_LOCK:
-        if _TRACKER is None:
-            raise RuntimeError(f"Hand tracker failed to initialise: {_TRACKER_ERROR}")
-        return _TRACKER
+def get_tracker(attempts: int = 3) -> HandTracker:
+    """Return the shared tracker, retrying initialisation if it failed."""
+    global _TRACKER_STARTED, _TRACKER_ERROR
+    last_error: BaseException | None = None
+    for attempt in range(max(1, attempts)):
+        warm_tracker()
+        _TRACKER_READY.wait()
+        with _TRACKER_LOCK:
+            if _TRACKER is not None:
+                return _TRACKER
+            last_error = _TRACKER_ERROR
+            # Reset so the next warm_tracker() call starts a fresh attempt.
+            _TRACKER_STARTED = False
+            _TRACKER_ERROR = None
+            _TRACKER_READY.clear()
+        time.sleep(0.5 * (attempt + 1))
+    raise RuntimeError(f"Hand tracker failed to initialise: {last_error}")
 
 
 def shutdown_tracker() -> None:
@@ -732,7 +824,7 @@ class CameraProbe(QThread):
 
         # Offer Sparsh streams when reachable across 5G modem or direct Ethernet
         target_hosts = [SPARSH_HOST]
-        for alt_host in ("10.101.0.70", "192.168.128.10"):
+        for alt_host in ("10.101.0.73", "192.168.128.10"):
             if alt_host not in target_hosts:
                 target_hosts.append(alt_host)
 

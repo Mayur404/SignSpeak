@@ -17,7 +17,7 @@ def _clamp(value: float, low: float, high: float) -> float:
 class Settings:
     # Camera
     camera_index: int = 0
-    camera_source: str = "rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=1.sdp"
+    camera_source: str = ""
     mirror: bool = True
     inference_width: int = 800
     capture_delay: float = 3.0
@@ -33,15 +33,15 @@ class Settings:
     auto_sentence: bool = True
     speak_letters: bool = False
     tts_voice: str = ""
-    tts_provider: str = "local"
-    tts_language: str = "hi-IN"
+    tts_provider: str = "sarvam"
+    tts_language: str = "en-IN"
     tts_rate: int = 0
     tts_volume: int = 100
     # Display
     draw_overlay: bool = True
     show_fps: bool = True
     # Model
-    active_model: str = "legacy"
+    active_model: str = "user"
 
     def sanitized(self) -> "Settings":
         self.camera_index = int(_clamp(self.camera_index, 0, 15))
@@ -58,12 +58,13 @@ class Settings:
         self.tts_volume = int(_clamp(self.tts_volume, 0, 100))
         if self.tts_provider not in ("local", "sarvam"):
             self.tts_provider = "local"
-        if self.active_model not in ("legacy", "user"):
-            self.active_model = "legacy"
+        # SignSpeak uses the personal classifier as its only active model.
+        # Older settings that selected the bundled classifier migrate here.
+        self.active_model = "user"
         return self
 
     def copy(self) -> "Settings":
-        return Settings(**asdict(self))
+        return Settings(**asdict(self)).sanitized()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

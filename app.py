@@ -8,7 +8,42 @@ import threading
 import time
 import webbrowser
 
-from signspeak.config import load_settings
+
+
+def _load_env_files() -> None:
+    """Load KEY=VALUE pairs from .env, then .env.example as a fallback.
+
+    Must run before signspeak.vision is imported, because it reads
+    CAMERA_HOST at import time. Real environment variables always win, and
+    placeholder values from the example file are skipped.
+    """
+    root = os.path.dirname(os.path.abspath(__file__))
+    for name in (".env", ".env.example"):
+        try:
+            with open(os.path.join(root, name), encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[7:].lstrip()
+            key, sep, value = line.partition("=")
+            key, value = key.strip(), value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            if not sep or not key or key in os.environ:
+                continue
+            if not value or value.startswith("your_"):
+                continue
+            os.environ[key] = value
+
+
+_load_env_files()
+
+from signspeak.config import load_settings  # noqa: E402
 
 
 def run_desktop_app(args: list[str]) -> int:
@@ -75,7 +110,8 @@ def run_web_app(host: str = "0.0.0.0", port: int = 8080, camera: str | None = No
                 pass
         threading.Thread(target=_open, daemon=True).start()
 
-    run_server(host=host, port=port)
+    engine = WebStreamEngine(settings)
+    run_server(host=host, port=port, engine=engine)
     return 0
 
 

@@ -278,14 +278,14 @@ class SettingsPage(QWidget):
             "Model & data", "Everything stays on this computer."
         )
         model_row = QHBoxLayout()
-        self.model_pill = Pill("BUNDLED", "violet")
+        self.model_pill = Pill("PERSONAL", "green")
         model_row.addWidget(self.model_pill)
         model_row.addStretch(1)
         model_body.addWidget(row_widget(model_row, 26))
-        self.model_name = QLabel("Bundled ASL model")
+        self.model_name = QLabel("Your personal model")
         self.model_name.setObjectName("H2")
         model_body.addWidget(self.model_name)
-        self.model_detail = QLabel("Random Forest · 38 signs")
+        self.model_detail = QLabel("Personal sign recognition")
         self.model_detail.setObjectName("Muted")
         self.model_detail.setWordWrap(True)
         model_body.addWidget(self.model_detail)
@@ -456,7 +456,7 @@ class SettingsPage(QWidget):
         if active_kind == "user":
             self.model_pill.set_status("PERSONAL", "green")
         else:
-            self.model_pill.set_status("BUNDLED", "violet")
+            self.model_pill.set_status("MODEL ERROR", "red")
         self.model_name.setText(info.name)
         parts = [info.algorithm]
         if info.classes:

@@ -188,30 +188,61 @@ def load_user_classifier(path: Path = USER_MODEL) -> SignClassifier:
         raise ModelLoadError(f"Could not load your model: {exc}") from exc
     if not isinstance(bundle, dict) or "model" not in bundle:
         raise ModelLoadError("Personal model file has an unexpected format.")
-    labels = [str(label) for label in bundle.get("labels", [])]
-    model = bundle["model"]
-    classes = [str(c) for c in getattr(model, "classes_", labels)]
-    info = ModelInfo(
-        kind="user",
-        name="Your personal model",
-        feature_mode=str(bundle.get("feature_mode", "rich63")),
-        algorithm=str(bundle.get("algorithm", "Custom classifier")),
-        accuracy=float(bundle["accuracy"]) if bundle.get("accuracy") is not None else None,
-        trained_at=bundle.get("trained_at"),
-        samples=int(bundle["samples"]) if bundle.get("samples") is not None else None,
-        classes=len(classes),
-        validation_method=str(bundle.get("validation_method", "sample-level split")),
-        balanced_accuracy=(
+    try:
+        labels = [str(label) for label in bundle.get("labels", [])]
+        model = bundle["model"]
+        if not callable(getattr(model, "predict", None)):
+            raise ModelLoadError("Personal model does not provide a prediction method.")
+        classes = [str(c) for c in getattr(model, "classes_", labels)]
+        feature_mode = str(bundle.get("feature_mode", "rich63"))
+        if feature_mode not in FEATURE_DIMS:
+            raise ModelLoadError(f"Personal model uses unsupported features: {feature_mode}.")
+        if not classes:
+            raise ModelLoadError("Personal model contains no sign labels.")
+        expected_features = FEATURE_DIMS[feature_mode]
+        model_features = getattr(model, "n_features_in_", expected_features)
+        if int(model_features) != expected_features:
+            raise ModelLoadError(
+                f"Personal model expects {model_features} features; {feature_mode} requires {expected_features}."
+            )
+        accuracy = float(bundle["accuracy"]) if bundle.get("accuracy") is not None else None
+        balanced_accuracy = (
             float(bundle["balanced_accuracy"])
-            if bundle.get("balanced_accuracy") is not None
-            else None
-        ),
-    )
-    return SignClassifier(model, info, classes)
+            if bundle.get("balanced_accuracy") is not None else None
+        )
+        if any(
+            score is not None and (not np.isfinite(score) or not 0 <= score <= 1)
+            for score in (accuracy, balanced_accuracy)
+        ):
+            raise ModelLoadError("Personal model contains an invalid validation score.")
+        samples = int(bundle["samples"]) if bundle.get("samples") is not None else None
+        if samples is not None and samples < 1:
+            raise ModelLoadError("Personal model contains an invalid sample count.")
+        info = ModelInfo(
+            kind="user",
+            name="Your personal model",
+            feature_mode=feature_mode,
+            algorithm=str(bundle.get("algorithm", "Custom classifier")),
+            accuracy=accuracy,
+            trained_at=bundle.get("trained_at"),
+            samples=samples,
+            classes=len(classes),
+            validation_method=str(bundle.get("validation_method", "sample-level split")),
+            balanced_accuracy=balanced_accuracy,
+        )
+        return SignClassifier(model, info, classes)
+    except ModelLoadError:
+        raise
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise ModelLoadError(f"Personal model metadata is invalid: {exc}") from exc
 
 
 def load_classifier(kind: str) -> SignClassifier:
-    return load_user_classifier() if kind == "user" else load_legacy_classifier()
+    if kind == "user":
+        return load_user_classifier()
+    if kind == "legacy":
+        return load_legacy_classifier()
+    raise ModelLoadError(f"Unsupported model type: {kind}")
 
 
 class Stabilizer:

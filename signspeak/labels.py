@@ -104,5 +104,5 @@ SIGN_HINTS: dict[str, str] = {
     "8": "Thumb and middle finger touch, other fingers up.",
     "9": "Thumb and index finger touch, other fingers up.",
     SPACE: "Custom gesture: thumbs up. Finishes the current word.",
-    PERIOD: "Custom gesture: 'I love you' (thumb, index, pinky). Finishes the sentence.",
+    PERIOD: "Custom gesture: thumb, index, pinky extended. Finishes the sentence.",
 }
