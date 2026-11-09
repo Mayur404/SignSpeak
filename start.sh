@@ -10,7 +10,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 source scripts/port.sh
 
 if [[ -f signspeak.pid ]] && kill -0 "$(cat signspeak.pid)" 2>/dev/null; then
-    PORT=$(cat signspeak.port 2>/dev/null || echo 8090)
+    PORT=$(cat signspeak.port 2>/dev/null || echo 18473)
     echo "SignSpeak is already running (PID: $(cat signspeak.pid))."
     for ip in $(hostname -I 2>/dev/null); do echo "  http://$ip:$PORT"; done
     exit 0

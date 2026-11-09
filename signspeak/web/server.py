@@ -245,7 +245,7 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
             "modem_direct_ip": "192.168.128.1",
             "camera_direct_ip": "192.168.128.10",
             "camera_login_url": "http://192.168.128.10:8080",
-            "default_port": int(os.environ.get("WEB_PORT", 8090)),
+            "default_port": int(os.environ.get("WEB_PORT", 18473)),
             "edge_server_ip": "172.16.0.11",
             "edge_hostname": "niralos-video",
         })
@@ -486,7 +486,7 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
 
 def run_server(
     host: str = "0.0.0.0",
-    port: int = 8090,
+    port: int = 18473,
     engine: WebStreamEngine | None = None,
 ) -> None:
     """Start the SignSpeak Web Server."""

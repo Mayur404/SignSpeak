@@ -1,7 +1,7 @@
 # Shared port selection for start.sh / run.sh (sourced, not executed).
 #
 # Port 8080 on the edge VM is used by the NiralOS web console, so SignSpeak
-# defaults to 8090. WEB_PORT in .env (or the environment) overrides it; if
+# defaults to 18473. WEB_PORT in .env (or the environment) overrides it; if
 # that port is already taken, the next free port from a short list is used.
 
 port_in_use() {
@@ -28,9 +28,9 @@ pick_port() {
     if [[ -z "$wanted" && -f .env ]]; then
         wanted=$(grep -E '^WEB_PORT=' .env | tail -1 | cut -d= -f2- | tr -d '[:space:]"'"'" || true)
     fi
-    wanted="${wanted:-8090}"
+    wanted="${wanted:-18473}"
     local port
-    for port in "$wanted" 8090 8091 8092 8501 5050 9090; do
+    for port in "$wanted" 18473 18474 18475 28473; do
         if ! port_in_use "$port"; then
             if [[ "$port" != "$wanted" ]]; then
                 echo "Port $wanted is already used by another service; using port $port instead." >&2
@@ -39,6 +39,6 @@ pick_port() {
             return 0
         fi
     done
-    echo "Error: no free port found (tried $wanted 8090 8091 8092 8501 5050 9090)." >&2
+    echo "Error: no free port found (tried $wanted 18473 18474 18475 28473)." >&2
     return 1
 }

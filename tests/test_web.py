@@ -59,7 +59,7 @@ class WebAppTestCase(unittest.TestCase):
         res = self.client.get("/api/system")
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
-        self.assertEqual(data["default_port"], int(os.environ.get("WEB_PORT", 8090)))
+        self.assertEqual(data["default_port"], int(os.environ.get("WEB_PORT", 18473)))
         self.assertEqual(data["modem_direct_ip"], "192.168.128.1")
         self.assertEqual(data["camera_login_url"], "http://192.168.128.10:8080")
 
@@ -130,7 +130,7 @@ class WebAppTestCase(unittest.TestCase):
             )
         engine_type.assert_called_once_with(settings)
         run_server.assert_called_once_with(
-            host="0.0.0.0", port=8090, engine=engine_type.return_value
+            host="0.0.0.0", port=18473, engine=engine_type.return_value
         )
         self.assertEqual(settings.camera_source, camera)
 

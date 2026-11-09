@@ -9,8 +9,8 @@ wireless network to a server at the edge of that network (`172.16.0.11`, VM: `ni
 MediaPipe tracking and machine learning inference. Keeping the work at the edge keeps latency minimal:
 from holding a hand shape to your phone or laptop speaking the word is under half a second.
 
-The interface is a web dashboard running on **port 8090**. Anyone connected to the lab Wi-Fi or edge
-network can open `http://172.16.0.11:8090` (or `http://localhost:8090` on a laptop) on their phone,
+The interface is a web dashboard running on **port 18473**. Anyone connected to the lab Wi-Fi or edge
+network can open `http://172.16.0.11:18473` (or `http://localhost:18473` on a laptop) on their phone,
 tablet, or PC to view the live annotated video stream, compose sentences, and hear speech synthesis
 directly through their own device's speakers.
 
@@ -38,7 +38,7 @@ directly through their own device's speakers.
 
 | Item | What it is |
 |---|---|
-| `app.py` | The program. Starts the Web Dashboard on port 8090. |
+| `app.py` | The program. Starts the Web Dashboard on port 18473. |
 | `start.sh` | Starts the program in the background on the 5G edge server. |
 | `stop.sh` | Stops the background program cleanly. |
 | `run.sh` | Starts the program in the foreground (Linux / Mac). |
@@ -48,7 +48,7 @@ directly through their own device's speakers.
 | `signspeak/` | Core Python engine: vision pipeline, hand tracking, recognition, composer. |
 | `assets/models/` | MediaPipe hand landmarker (`hand_landmarker.task`) and legacy model compatibility asset. |
 | `data/` | User settings (`settings.json`), active personal model (`user_model.joblib`), recordings. |
-| `.env` / `.env.example` | Network settings: camera IP (`CAMERA_HOST`) and web port (`WEB_PORT`, default `8090`). |
+| `.env` / `.env.example` | Network settings: camera IP (`CAMERA_HOST`) and web port (`WEB_PORT`, default `18473`). |
 | `requirements.txt` | Python dependencies (Flask, OpenCV, MediaPipe, scikit-learn, numpy). |
 | `tests/` | Automated unit test suite (`test_core.py`, `test_web.py`). |
 
@@ -78,11 +78,11 @@ built-in webcam or USB camera and access the web UI from your laptop or your pho
      run.bat
      ```
      *(Or `python app.py`)*
-4. Open **http://localhost:8090** in your web browser.
+4. Open **http://localhost:18473** in your web browser.
 5. **Connect from your phone on the same Wi-Fi**:
    Find your laptop's local IP address (e.g. `192.168.1.45`) and open:
    ```text
-   http://192.168.1.45:8090
+   http://192.168.1.45:18473
    ```
    The camera feed and transcript will load on your phone, and speech will play right from your phone's speakers!
 
@@ -117,12 +117,12 @@ camera at `CAMERA_HOST` (default `10.101.0.74`).
   Microsoft voice; Hindi, Tamil, Telugu and the other Indian languages are spoken by Sarvam
   (needs `SARVAM_API_KEY` in `.env`). Use Edge or Chrome on Windows to open the dashboard.
 
-The script prints the URLs to open from your PC, e.g. `http://172.16.0.11:8090`.
+The script prints the URLs to open from your PC, e.g. `http://172.16.0.11:18473`.
 
 ### 3. Open the Dashboard
 Connect your laptop or phone to the lab Wi-Fi, open your browser, and navigate to:
 ```text
-http://172.16.0.11:8090
+http://172.16.0.11:18473
 ```
 The dashboard will connect immediately. You can view the live camera stream, see recognized ASL signs,
 and click "Speak Now" or enable auto-speech.
@@ -239,4 +239,4 @@ The web backend exposes a clean JSON and streaming REST API:
 | **RTSP returns 403 Forbidden** | Wrong stream path used. | Use `/avstream/channel=1/stream=1.sdp`. Never use `/stream1`. |
 | **Laggy video feed** | UDP packet buffering. | SignSpeak enforces TCP transport (`rtsp_transport;tcp`) and buffer size 1. Use the 720p substream. |
 | **Speech does not play** | Browser audio permissions. | Click anywhere on the webpage or press **"🔊 Speak Now"** to initialize the browser's Web Speech API. |
-| **Browser shows a NiralOS login page** | Port 8080 on the edge VM is the NiralOS console, not SignSpeak. | Open the URL `./start.sh` prints (default port **8090**). If a port is busy, `start.sh` picks the next free one; set `WEB_PORT` in `.env` to choose. |
+| **Browser shows a NiralOS login page** | Port 8080 on the edge VM is the NiralOS console, not SignSpeak. | Open the URL `./start.sh` prints (default port **18473**). If a port is busy, `start.sh` picks the next free one; set `WEB_PORT` in `.env` to choose. |
