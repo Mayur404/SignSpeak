@@ -5,12 +5,12 @@ translates them into characters, words, and sentences in real time, and speaks t
 native web speech synthesis. It was built for the private 5G lab at IIIT Dharwad (EC368).
 
 There, a high-definition Sparsh CCTV camera transmits its video feed over the lab's dedicated 5G
-wireless network to a server at the edge of that network (`172.16.0.10`), and the server does the
+wireless network to a server at the edge of that network (`172.16.0.11`, VM: `niralos-video`), and the server does the
 MediaPipe tracking and machine learning inference. Keeping the work at the edge keeps latency minimal:
 from holding a hand shape to your phone or laptop speaking the word is under half a second.
 
 The interface is a web dashboard running on **port 8080**. Anyone connected to the lab Wi-Fi or edge
-network can open `http://172.16.0.10:8080` (or `http://localhost:8080` on a laptop) on their phone,
+network can open `http://172.16.0.11:8080` (or `http://localhost:8080` on a laptop) on their phone,
 tablet, or PC to view the live annotated video stream, compose sentences, and hear speech synthesis
 directly through their own device's speakers.
 
@@ -90,13 +90,13 @@ built-in webcam or USB camera and access the web UI from your laptop or your pho
 
 ## Running it in the 5G lab
 
-In the lab, SignSpeak runs on the edge server VM at `172.16.0.10` (or `172.16.0.11`), in the folder
+In the lab, SignSpeak runs on the edge server VM at `172.16.0.11` (hostname: `niralos-video`), in the folder
 `~/5Gusecase/SignSpeak` (or `~/SignSpeak`). That server sits right behind the 5G core UPF gateway (`172.16.0.7`),
 so any video the 5G camera sends has crossed the private 5G air interface.
 
 ### 1. SSH into the edge server
 ```bash
-ssh user@172.16.0.10
+ssh user@172.16.0.11
 cd ~/5Gusecase/SignSpeak
 ```
 
@@ -110,7 +110,7 @@ You will see:
   SignSpeak Web UI is running in background (PID: 12345)
 ==========================================================
   * Local browser:    http://localhost:8080
-  * 5G Edge Server:   http://172.16.0.10:8080
+  * 5G Edge Server:   http://172.16.0.11:8080
   * View live logs:   tail -f signspeak.log
   * Stop server:      ./stop.sh
 ==========================================================
@@ -119,7 +119,7 @@ You will see:
 ### 3. Open the Dashboard
 Connect your laptop or phone to the lab Wi-Fi, open your browser, and navigate to:
 ```text
-http://172.16.0.10:8080
+http://172.16.0.11:8080
 ```
 The dashboard will connect immediately. You can view the live camera stream, see recognized ASL signs,
 and click "Speak Now" or enable auto-speech.

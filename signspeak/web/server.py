@@ -130,7 +130,8 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
             "modem_direct_ip": "192.168.128.1",
             "camera_direct_ip": "192.168.128.10",
             "default_port": 8080,
-            "edge_server_ip": "172.16.0.10",
+            "edge_server_ip": "172.16.0.11",
+            "edge_hostname": "niralos-video",
         })
 
     return app
@@ -149,7 +150,7 @@ def run_server(host: str = "0.0.0.0", port: int = 8080) -> None:
     print("=" * 70)
     print(f"  * Local browser:    http://localhost:{port}")
     print(f"  * Wi-Fi / LAN:      http://{primary_ip}:{port}")
-    print(f"  * 5G Edge VM:       http://172.16.0.10:{port} (if on edge VM)")
+    print(f"  * 5G Edge VM (niralos-video): http://172.16.0.11:{port}")
     print(f"  * Camera:           {engine.settings.camera_source or 'Default webcam / 5G'}")
     print("=" * 70)
     print("  Press Ctrl+C to stop.\n")
@@ -158,3 +159,4 @@ def run_server(host: str = "0.0.0.0", port: int = 8080) -> None:
         app.run(host=host, port=port, threaded=True, debug=False)
     finally:
         engine.stop()
+
