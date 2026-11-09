@@ -97,13 +97,28 @@ In the standard 5G lab setup, the camera streams directly across the 5G radio li
 
 1. Plug the Sparsh camera's Ethernet cable into the LAN port of the **5G modem** (T99W240).
 2. Power both on and wait about a minute for the modem to register with the 5G network.
-3. Check the modem's 5G WAN IP (typically `10.101.0.70` or check the modem dashboard).
-4. The camera stream is available over RTSP:
+3. **Find the current camera 5G IP**:
+   * The 5G modem assigns a new dynamic WAN IP each time it reconnects.
+   * Open the modem's local status page in your browser at:
+     ```text
+     http://192.168.128.1
+     ```
+   * Look for the **"WAN IPv4 Address"** (for example, `10.101.0.70`).
+4. **Set the camera IP in `.env`**:
+   * Put the current IP in your `.env` file on the VM or laptop:
+     ```ini
+     CAMERA_HOST=10.101.0.70
+     ```
+   * Or specify the full URL in `data/settings.json`:
+     ```json
+     "camera_source": "rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=1.sdp"
+     ```
+5. The camera stream is available over RTSP:
    ```text
    rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=1.sdp
    ```
-   *(SignSpeak automatically probes `10.101.0.70` and lists **Sparsh CCTV [5G]** in the camera picker dropdown).*
-5. To test the 5G link from the VM terminal:
+   *(SignSpeak automatically probes the configured `CAMERA_HOST` and lists it in the camera picker dropdown).*
+6. To test the 5G link from the VM terminal:
    ```bash
    tracepath -n 10.101.0.70
    ```
