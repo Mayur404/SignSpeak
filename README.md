@@ -180,9 +180,16 @@ The modem automatically DMZ-forwards incoming RTSP port `554` traffic directly t
 If the 5G modem is turned off and the camera is plugged directly into a laptop's Ethernet port
 (`192.168.128.100`), the camera's fixed IP is `192.168.128.10`.
 
-* If running SignSpeak directly on that laptop:
+* **Camera Web Login**:
+  To access the camera's web administration and live video stream portal directly through Ethernet, open:
+  ```text
+  http://192.168.128.10:8080
+  ```
+  *(Default credentials: Username `admin`, Password `admin123`)*
+
+* **If running SignSpeak directly on that laptop**:
   Click the **"🔌 Direct Ethernet (192.168.128.10)"** preset in the Web UI.
-* If running SignSpeak on the VM, forward port 554 from the laptop using Windows portproxy:
+* **If running SignSpeak on the VM (`niralos-video`)**, forward port 554 from the laptop using Windows portproxy:
   ```powershell
   netsh interface portproxy add v4tov4 listenport=554 listenaddress=0.0.0.0 connectport=554 connectaddress=192.168.128.10
   ```

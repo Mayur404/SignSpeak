@@ -917,12 +917,13 @@
         <p>SignSpeak is optimized for the private 5G Multi-access Edge Computing (MEC) lab at IIIT Dharwad (EC368). The Sparsh camera transmits over the lab's 5G network to the edge server VM <code>niralos-video</code> (<code>172.16.0.11</code>).</p>
 
         <div class="guide-callout">
-          <strong>⚠️ Finding the 5G Camera WAN IP:</strong><br>
+          <strong>⚠️ Finding the 5G Camera WAN IP & Direct Ethernet Access:</strong><br>
           1. The 5G modem assigns a dynamic WAN IP upon reconnecting (e.g. <code>10.101.0.70</code>).<br>
           2. The modem admin page (<code>192.168.128.1</code>) is <strong>NOT</strong> accessible from Wi-Fi or over 5G.<br>
           3. You <strong>MUST</strong> connect your laptop directly to the modem via an <strong>Ethernet cable</strong>.<br>
           4. Set your laptop static IP to <code>192.168.128.100</code>, mask <code>255.255.255.0</code>.<br>
-          5. Open <code>http://192.168.128.1</code> in your browser, check the 5G WAN IP, and update <code>CAMERA_HOST</code> in <code>.env</code>.
+          5. Open <code>http://192.168.128.1</code> in your browser, check the 5G WAN IP, and update <code>CAMERA_HOST</code> in <code>.env</code>.<br>
+          6. To access the camera web portal login directly via Ethernet, open <code>http://192.168.128.10:8080</code> (Login: <code>admin</code> / <code>admin123</code>).
         </div>
 
         <h4 style="margin-top: 14px; color: var(--text);">Direct RTSP Stream Paths (Sparsh Topsvision v2.1):</h4>

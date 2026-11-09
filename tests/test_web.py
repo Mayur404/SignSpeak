@@ -49,6 +49,7 @@ class WebAppTestCase(unittest.TestCase):
         data = res.get_json()
         self.assertEqual(data["default_port"], 8080)
         self.assertEqual(data["modem_direct_ip"], "192.168.128.1")
+        self.assertEqual(data["camera_login_url"], "http://192.168.128.10:8080")
 
     def test_composer_actions(self):
         # Type letters

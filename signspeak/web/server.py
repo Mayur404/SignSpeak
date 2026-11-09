@@ -129,6 +129,7 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
             "camera_env_host": env_host,
             "modem_direct_ip": "192.168.128.1",
             "camera_direct_ip": "192.168.128.10",
+            "camera_login_url": "http://192.168.128.10:8080",
             "default_port": 8080,
             "edge_server_ip": "172.16.0.11",
             "edge_hostname": "niralos-video",
