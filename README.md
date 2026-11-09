@@ -10,6 +10,7 @@ SignSpeak is a desktop app that turns ASL fingerspelling into text and speech. I
 - Personal training with your own handshapes, including custom words and a backspace gesture.
 - Transcript editing, word spacing, and optional speech. Windows with Python 3.11 or later uses Microsoft Edge voices; other setups use installed system voices.
 - Optional Sarvam Bulbul speech in 11 Indian languages, configured in Settings.
+- Record a short spoken phrase in Settings-supported Indian languages, transcribe it with Sarvam, then train a custom sign that speaks the phrase when recognized.
 - Local processing and storage; camera frames are not uploaded.
 - Supports both local USB webcams and network RTSP / IP CCTV cameras (including Sparsh SC-IM82NP-I(Z)(S)(H)).
 
@@ -28,19 +29,17 @@ Start SignSpeak from the project folder:
 .\.venv\Scripts\python.exe app.py
 ```
 
-On Ubuntu 22.04, install the system dependencies and run SignSpeak in a virtual environment:
+On an Ubuntu 22.04 desktop VM, clone the repository and run the setup script. It installs Qt/OpenCV system libraries, creates `.venv`, and installs the Python requirements:
 
 ```bash
-sudo apt update
-sudo apt install -y git python3-venv libgl1 libglib2.0-0 libxcb-cursor0 libxkbcommon-x11-0 espeak-ng libespeak1
 git clone https://github.com/Mayur404/SignSpeak.git
 cd SignSpeak
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python app.py
+chmod +x setup_ubuntu.sh run.sh
+./setup_ubuntu.sh
+./run.sh
 ```
+
+The VM needs a graphical desktop session and a connected or passed-through webcam for live signing. To open the UI without a camera or speech device, run `./run.sh --no-camera --no-speech`. To enable phrase transcription and Sarvam speech, copy `.env.example` to `.env` and add your Sarvam API key.
 
 The Linux requirements use `opencv-python-headless` so OpenCV does not override Qt's display plugin. If this environment previously installed `opencv-python`, remove it before installing the current requirements:
 
@@ -98,7 +97,7 @@ Training compares an RBF SVM, Extra Trees, Random Forest and K-Nearest Neighbour
 
 ## Local data and privacy
 
-Camera frames, hand landmarks, recognition, and training stay local. Recorded landmark samples, the trained model, and settings are stored in `data/`. On Windows with Python 3.11 or later, Edge speech sends spoken text to Microsoft's online speech service; other setups use local system voices. Sarvam is an optional online provider for Indian languages: create a Sarvam API key, set `SARVAM_API_KEY` before launching SignSpeak, then select **Sarvam (Indian languages)** and a language under **Settings → Speech**. The spoken transcript is sent to Sarvam when speech is requested. SignSpeak does not upload camera frames, samples, or models.
+Camera frames, hand landmarks, recognition, and training stay local. Recorded landmark samples, the trained model, and settings are stored in `data/`. On Windows with Python 3.11 or later, Edge speech sends spoken text to Microsoft's online speech service; other setups use local system voices. Sarvam is an optional online provider for Indian language speech: add `SARVAM_API_KEY=your_key` to the project `.env` file. On the Train page, choose **Record phrase**, speak a phrase for up to 30 seconds, and choose **Stop recording**. SignSpeak then transcribes the phrase with Sarvam, which detects the spoken language and returns the transcript in that language's script; add the phrase, record its handshape over several separate takes, and train the personal model. With **Speak words** enabled, SignSpeak sends the phrase to Sarvam for playback when its sign is recognized. Voice recordings and transcript text are sent to Sarvam for transcription and speech generation. SignSpeak does not currently translate spoken English into an Indian language, and does not upload camera frames, samples, or models.
 
 ## Troubleshooting
 

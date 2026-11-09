@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from ...labels import (
     BACKSPACE,
+    MAX_CUSTOM_WORD_LENGTH,
     SIGN_HINTS,
     TRAIN_LABELS,
     custom_word_label,
@@ -80,6 +81,8 @@ class TrainPage(QWidget):
     clear_label = Signal(str)
     clear_dataset = Signal()
     toast_requested = Signal(str, str)
+    voice_record_requested = Signal()
+    voice_stop_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -254,9 +257,19 @@ class TrainPage(QWidget):
         custom_row = QHBoxLayout()
         self.custom_word_input = QLineEdit()
         self.custom_word_input.setPlaceholderText("Add a custom word or short phrase")
-        self.custom_word_input.setMaxLength(48)
+        self.custom_word_input.setMaxLength(MAX_CUSTOM_WORD_LENGTH)
         self.custom_word_input.returnPressed.connect(self.add_custom_word)
         custom_row.addWidget(self.custom_word_input, 1)
+        self.record_phrase_button = QPushButton("Record phrase")
+        self.record_phrase_button.setObjectName("Ghost")
+        self.record_phrase_button.clicked.connect(self.voice_record_requested)
+        custom_row.addWidget(self.record_phrase_button)
+        self.stop_phrase_button = QPushButton("Stop recording")
+        self.stop_phrase_button.setObjectName("Ghost")
+        self.stop_phrase_button.setToolTip("Stop the recording and transcribe the spoken phrase.")
+        self.stop_phrase_button.setEnabled(False)
+        self.stop_phrase_button.clicked.connect(self.voice_stop_requested)
+        custom_row.addWidget(self.stop_phrase_button)
         self.add_custom_word_button = QPushButton("Add word")
         self.add_custom_word_button.setObjectName("Ghost")
         self.add_custom_word_button.clicked.connect(self.add_custom_word)
@@ -399,11 +412,11 @@ class TrainPage(QWidget):
         tile.clicked.connect(lambda _checked=False, value=label: self._select(value))
 
     def add_custom_word(self) -> None:
-        word = " ".join(self.custom_word_input.text().split()).upper()
+        word = " ".join(self.custom_word_input.text().split())
         label = custom_word_label(word)
         if not is_trainable_label(label):
             self.toast_requested.emit(
-                "Enter a word or short phrase using letters, numbers, spaces, apostrophes or hyphens.",
+                "Enter a word or short phrase with letters in any language.",
                 "error",
             )
             return
@@ -411,6 +424,27 @@ class TrainPage(QWidget):
         self.custom_word_input.clear()
         self.tiles[label].setChecked(True)
         self._select(label)
+
+    def set_phrase_recording(self, recording: bool) -> None:
+        self.record_phrase_button.setEnabled(not recording)
+        self.stop_phrase_button.setEnabled(recording)
+        self.record_phrase_button.setText("Recording…" if recording else "Record phrase")
+
+    def set_phrase_transcribing(self, transcribing: bool) -> None:
+        self.record_phrase_button.setEnabled(not transcribing)
+        self.stop_phrase_button.setEnabled(False)
+        self.record_phrase_button.setText("Transcribing…" if transcribing else "Record phrase")
+
+    def set_recognized_phrase(self, phrase: str) -> bool:
+        phrase = " ".join(phrase.split())
+        if len(phrase) > self.custom_word_input.maxLength():
+            self.toast_requested.emit(
+                f"This phrase is longer than the {MAX_CUSTOM_WORD_LENGTH}-character custom-sign limit. Shorten it before adding the sign.",
+                "error",
+            )
+            return False
+        self.custom_word_input.setText(phrase)
+        return True
 
     def _refresh(self) -> None:
         count = self._counts.get(self._selected, 0)

@@ -67,8 +67,8 @@ class ComposerTests(unittest.TestCase):
     def test_custom_word_is_a_finished_word_and_backspace_gesture_deletes(self):
         composer = TextComposer()
         result = composer.commit(custom_word_label("good morning"))
-        self.assertEqual(result.speak_word, "GOOD MORNING")
-        self.assertEqual(composer.transcript, "GOOD MORNING")
+        self.assertEqual(result.speak_word, "good morning")
+        self.assertEqual(composer.transcript, "good morning")
         composer.commit("A")
         self.assertTrue(composer.commit(BACKSPACE).changed)
         self.assertEqual(composer.word, "")

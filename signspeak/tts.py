@@ -12,6 +12,7 @@ import threading
 from urllib.request import Request, urlopen
 from pathlib import Path
 from typing import Any
+from .paths import APP_ROOT
 
 from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtCore import QByteArray, QEventLoop, QIODevice, QTimer
@@ -26,10 +27,32 @@ SARVAM_LANGUAGES = {
 }
 
 
+def _load_project_env() -> None:
+    """Load simple KEY=VALUE entries from the project's ignored .env file."""
+    env_file = APP_ROOT / ".env"
+    try:
+        lines = env_file.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        key, separator, value = line.partition("=")
+        if separator and key.strip() and key.strip() not in os.environ:
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            os.environ[key.strip()] = value
+
+
 class _SarvamBackend:
     """Sarvam Bulbul TTS for Indian language speech."""
 
     def __init__(self) -> None:
+        _load_project_env()
         self.api_key = os.environ.get("SARVAM_API_KEY", "").strip()
         self.output = QAudioOutput()
         self.player = QMediaPlayer()

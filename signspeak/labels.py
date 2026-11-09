@@ -1,12 +1,15 @@
 """Gesture vocabulary and human-readable descriptions."""
 from __future__ import annotations
 
+import unicodedata
+
 LETTERS = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 DIGITS = [str(d) for d in range(10)]
 SPACE = " "
 PERIOD = "."
 BACKSPACE = "__BACKSPACE__"
 CUSTOM_WORD_PREFIX = "__WORD__:"
+MAX_CUSTOM_WORD_LENGTH = 110
 
 # Order used by the bundled RandomForest (classes 0..37).
 LEGACY_INDEX_TO_LABEL = {i: ch for i, ch in enumerate(LETTERS + DIGITS)}
@@ -23,7 +26,7 @@ TRAIN_LABELS = LABELS + [BACKSPACE]
 
 
 def custom_word_label(word: str) -> str:
-    normalized = " ".join(str(word).split()).upper()
+    normalized = " ".join(str(word).split())
     return f"{CUSTOM_WORD_PREFIX}{normalized}"
 
 
@@ -37,8 +40,9 @@ def is_trainable_label(label: str) -> bool:
     if not is_custom_word_label(label):
         return False
     word = str(label)[len(CUSTOM_WORD_PREFIX) :]
-    return bool(word) and len(word) <= 48 and all(
-        char.isalnum() or char in " '-" for char in word
+    return bool(word) and len(word) <= MAX_CUSTOM_WORD_LENGTH and all(
+        unicodedata.category(char)[0] != "C" or char in "\u200c\u200d"
+        for char in word
     )
 
 

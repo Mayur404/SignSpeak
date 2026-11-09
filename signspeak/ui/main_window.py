@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 import time
 import shutil
+import os
+import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer
@@ -27,11 +29,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from PySide6.QtCore import QUrl
+from PySide6.QtMultimedia import QAudioInput, QMediaCaptureSession, QMediaFormat, QMediaRecorder
 
 from ..composer import TextComposer
 from ..config import Settings, save_settings
 from ..labels import display_name, is_custom_word_label, spoken_name
 from ..paths import USER_MODEL
+from ..speech_input import TranscriptionThread
 from ..recognition import (
     ModelLoadError,
     RecognitionEngine,
@@ -40,7 +45,7 @@ from ..recognition import (
     load_user_classifier,
 )
 from ..trainer import DatasetStore, TrainingResult
-from ..tts import SpeechEngine
+from ..tts import SARVAM_LANGUAGES, SpeechEngine, _load_project_env
 from ..vision import CameraProbe, CameraWorker, shutdown_tracker
 from . import theme
 from .icons import make_icon
@@ -90,6 +95,15 @@ class MainWindow(QMainWindow):
         self._camera_started = False
         self._camera_restart_pending = False
         self._probe: CameraProbe | None = None
+        self._phrase_capture: QMediaCaptureSession | None = None
+        self._phrase_audio_input: QAudioInput | None = None
+        self._phrase_recorder: QMediaRecorder | None = None
+        self._phrase_path: Path | None = None
+        self._transcription_thread: TranscriptionThread | None = None
+        self._phrase_limit_timer = QTimer(self)
+        self._phrase_limit_timer.setSingleShot(True)
+        self._phrase_limit_timer.setInterval(30_000)
+        self._phrase_limit_timer.timeout.connect(self.stop_phrase_recording)
 
         self.setWindowTitle("SignSpeak — Sign Language to Speech")
         self.setWindowIcon(_window_icon())
@@ -300,6 +314,8 @@ class MainWindow(QMainWindow):
 
         train = self.train_page
         train.record_requested.connect(self.start_recording)
+        train.voice_record_requested.connect(self.start_phrase_recording)
+        train.voice_stop_requested.connect(self.stop_phrase_recording)
         train.cancel_recording.connect(self.cancel_recording)
         train.capture_delay_changed.connect(
             lambda value: self.update_setting("capture_delay", value)
@@ -635,6 +651,108 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Training
     # ------------------------------------------------------------------
+    def start_phrase_recording(self) -> None:
+        _load_project_env()
+        if not os.environ.get("SARVAM_API_KEY", "").strip():
+            self.show_toast("Add SARVAM_API_KEY to the project .env file before recording a phrase.", "error", 5000)
+            return
+        if self._phrase_recorder is not None or self._transcription_thread is not None:
+            return
+        try:
+            from PySide6.QtMultimedia import QMediaDevices
+
+            device = QMediaDevices.defaultAudioInput()
+            if device.isNull():
+                raise RuntimeError("No microphone was found.")
+            fd, name = tempfile.mkstemp(prefix="signspeak-phrase-", suffix=".wav")
+            os.close(fd)
+            os.unlink(name)
+            self._phrase_path = Path(name)
+            capture = QMediaCaptureSession(self)
+            audio_input = QAudioInput(device, self)
+            recorder = QMediaRecorder(self)
+            media_format = QMediaFormat()
+            media_format.setFileFormat(QMediaFormat.FileFormat.Wave)
+            recorder.setMediaFormat(media_format)
+            recorder.setOutputLocation(QUrl.fromLocalFile(str(self._phrase_path)))
+            capture.setAudioInput(audio_input)
+            capture.setRecorder(recorder)
+            recorder.errorOccurred.connect(
+                lambda _error, message: self.show_toast(f"Microphone recording failed: {message}", "error", 5000)
+            )
+            self._phrase_capture = capture
+            self._phrase_audio_input = audio_input
+            self._phrase_recorder = recorder
+            self.train_page.set_phrase_recording(True)
+            recorder.record()
+            self._phrase_limit_timer.start()
+        except Exception as exc:
+            self._clear_phrase_capture()
+            self.train_page.set_phrase_recording(False)
+            self.show_toast(f"Could not start microphone recording: {exc}", "error", 5000)
+
+    def stop_phrase_recording(self) -> None:
+        recorder = self._phrase_recorder
+        if recorder is None:
+            return
+        self._phrase_limit_timer.stop()
+        recorder.stop()
+        self._phrase_recorder = None
+        recorder.deleteLater()
+        self.train_page.set_phrase_recording(False)
+        self.train_page.set_phrase_transcribing(True)
+        QTimer.singleShot(700, self._transcribe_recorded_phrase)
+
+    def _transcribe_recorded_phrase(self) -> None:
+        path = self._phrase_path
+        self._clear_phrase_capture(keep_path=True)
+        if path is None or not path.exists():
+            self._finish_phrase_recording()
+            self.show_toast("No recording was saved. Check microphone access and try again.", "error", 5000)
+            return
+        self._transcription_thread = TranscriptionThread(path, self)
+        self._transcription_thread.completed.connect(self._on_phrase_transcribed)
+        self._transcription_thread.failed.connect(self._on_phrase_transcription_failed)
+        self._transcription_thread.finished.connect(self._finish_phrase_recording)
+        self._transcription_thread.start()
+
+    def _on_phrase_transcribed(self, phrase: str, language: str) -> None:
+        accepted = self.train_page.set_recognized_phrase(phrase)
+        if language in SARVAM_LANGUAGES.values():
+            self.update_setting("tts_provider", "sarvam")
+            self.update_setting("tts_language", language)
+            self.settings_page.set_values(self.settings)
+        if accepted:
+            self.show_toast(f"Recognized: {phrase}", "success", 4500)
+
+    def _on_phrase_transcription_failed(self, message: str) -> None:
+        self.show_toast(message, "error", 6000)
+
+    def _finish_phrase_recording(self) -> None:
+        if self._phrase_path is not None:
+            self._phrase_path.unlink(missing_ok=True)
+            self._phrase_path = None
+        self._transcription_thread = None
+        self.train_page.set_phrase_transcribing(False)
+
+    def _clear_phrase_capture(self, keep_path: bool = False) -> None:
+        recorder, capture, audio_input = (
+            self._phrase_recorder, self._phrase_capture, self._phrase_audio_input
+        )
+        self._phrase_recorder = None
+        self._phrase_capture = None
+        self._phrase_audio_input = None
+        if recorder is not None:
+            recorder.stop()
+            recorder.deleteLater()
+        if capture is not None:
+            capture.deleteLater()
+        if audio_input is not None:
+            audio_input.deleteLater()
+        if not keep_path and self._phrase_path is not None:
+            self._phrase_path.unlink(missing_ok=True)
+            self._phrase_path = None
+
     def start_recording(self, label: str, duration: float, delay: float = 0.0) -> None:
         if self.worker is None or not self.worker.isRunning() or self._paused:
             self.show_toast("Start the camera before recording samples.", "info")
@@ -1011,12 +1129,20 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):  # noqa: N802
         self._closing = True
         self._save_settings()
+        if self._phrase_recorder is not None:
+            self.stop_phrase_recording()
+            event.ignore()
+            QTimer.singleShot(900, self._retry_close_when_threads_stop)
+            return
         worker_stopped = self.stop_camera()
         probe_running = self._probe is not None and self._probe.isRunning()
         training_running = (
             self._training_thread is not None and self._training_thread.isRunning()
         )
-        if not worker_stopped or probe_running or training_running:
+        transcription_running = (
+            self._transcription_thread is not None and self._transcription_thread.isRunning()
+        )
+        if not worker_stopped or probe_running or training_running or transcription_running:
             event.ignore()
             QTimer.singleShot(150, self._retry_close_when_threads_stop)
             return
