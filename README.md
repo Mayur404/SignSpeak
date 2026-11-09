@@ -9,6 +9,7 @@ SignSpeak is a desktop app that turns ASL fingerspelling into text and speech. I
 - Live ASL alphabet and digit recognition from a webcam, with up to two hands tracked together.
 - Personal training with your own handshapes, including custom words and a backspace gesture.
 - Transcript editing, word spacing, and optional speech. Windows with Python 3.11 or later uses Microsoft Edge voices; other setups use installed system voices.
+- Optional Sarvam Bulbul speech in 11 Indian languages, configured in Settings.
 - Local processing and storage; camera frames are not uploaded.
 - Supports both local USB webcams and network RTSP / IP CCTV cameras (including Sparsh SC-IM82NP-I(Z)(S)(H)).
 
@@ -97,7 +98,7 @@ Training compares an RBF SVM, Extra Trees, Random Forest and K-Nearest Neighbour
 
 ## Local data and privacy
 
-Camera frames, hand landmarks, recognition, and training stay local. Recorded landmark samples, the trained model, and settings are stored in `data/`. On Windows with Python 3.11 or later, Edge speech sends spoken text to Microsoft's online speech service; other setups use local system voices. SignSpeak does not upload camera frames, samples, or models.
+Camera frames, hand landmarks, recognition, and training stay local. Recorded landmark samples, the trained model, and settings are stored in `data/`. On Windows with Python 3.11 or later, Edge speech sends spoken text to Microsoft's online speech service; other setups use local system voices. Sarvam is an optional online provider for Indian languages: create a Sarvam API key, set `SARVAM_API_KEY` before launching SignSpeak, then select **Sarvam (Indian languages)** and a language under **Settings → Speech**. The spoken transcript is sent to Sarvam when speech is requested. SignSpeak does not upload camera frames, samples, or models.
 
 ## Troubleshooting
 

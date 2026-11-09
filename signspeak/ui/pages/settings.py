@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from ...config import Settings
 from ...paths import DATA_DIR
 from ...recognition import ModelInfo
+from ...tts import SARVAM_LANGUAGES
 from .. import theme
 from ..icons import make_icon
 from ..widgets import (
@@ -159,8 +160,30 @@ class SettingsPage(QWidget):
         )
         speech_card, speech_body = self._card(
             "Speech",
-            speech_description,
+            speech_description + " Sarvam Bulbul supports Indian languages; set SARVAM_API_KEY before launch.",
         )
+        provider_row = QHBoxLayout()
+        provider_label = QLabel("Provider")
+        provider_label.setObjectName("Value")
+        self.provider_combo = QComboBox()
+        self.provider_combo.addItem("Device / Edge", "local")
+        self.provider_combo.addItem("Sarvam (Indian languages)", "sarvam")
+        self.provider_combo.currentIndexChanged.connect(self._provider_changed)
+        provider_row.addWidget(provider_label)
+        provider_row.addStretch(1)
+        provider_row.addWidget(self.provider_combo)
+        speech_body.addWidget(row_widget(provider_row, 36))
+        language_row = QHBoxLayout()
+        language_label = QLabel("Language")
+        language_label.setObjectName("Value")
+        self.language_combo = QComboBox()
+        for name, code in SARVAM_LANGUAGES.items():
+            self.language_combo.addItem(name, code)
+        self.language_combo.currentIndexChanged.connect(self._language_changed)
+        language_row.addWidget(language_label)
+        language_row.addStretch(1)
+        language_row.addWidget(self.language_combo)
+        speech_body.addWidget(row_widget(language_row, 36))
         voice_row = QHBoxLayout()
         voice_caption = QLabel("Voice")
         voice_caption.setObjectName("Value")
@@ -342,6 +365,19 @@ class SettingsPage(QWidget):
         if data is not None:
             self._emit("tts_voice", str(data))
 
+    def _provider_changed(self, index: int) -> None:
+        provider = str(self.provider_combo.itemData(index) or "local")
+        self.language_combo.setVisible(provider == "sarvam")
+        self._emit("tts_provider", provider)
+        if provider == "sarvam":
+            self._emit("tts_voice", f"sarvam:{self.language_combo.currentData()}")
+
+    def _language_changed(self, index: int) -> None:
+        if self.provider_combo.currentData() == "sarvam":
+            language = str(self.language_combo.itemData(index))
+            self._emit("tts_language", language)
+            self._emit("tts_voice", f"sarvam:{language}")
+
     def _open_data(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(DATA_DIR)))
         self.toast_requested.emit(f"Opened {DATA_DIR}", "info")
@@ -373,6 +409,9 @@ class SettingsPage(QWidget):
             position = self.voice_combo.findData(settings.tts_voice)
             if position >= 0:
                 self.voice_combo.setCurrentIndex(position)
+            self.provider_combo.setCurrentIndex(max(0, self.provider_combo.findData(settings.tts_provider)))
+            self.language_combo.setCurrentIndex(max(0, self.language_combo.findData(settings.tts_language)))
+            self.language_combo.setVisible(settings.tts_provider == "sarvam")
         finally:
             self._syncing = False
 

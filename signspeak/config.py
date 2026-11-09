@@ -33,6 +33,8 @@ class Settings:
     auto_sentence: bool = True
     speak_letters: bool = False
     tts_voice: str = ""
+    tts_provider: str = "local"
+    tts_language: str = "hi-IN"
     tts_rate: int = 0
     tts_volume: int = 100
     # Display
@@ -54,6 +56,8 @@ class Settings:
         self.release_ms = int(_clamp(self.release_ms, 100, 2000))
         self.tts_rate = int(_clamp(self.tts_rate, -10, 10))
         self.tts_volume = int(_clamp(self.tts_volume, 0, 100))
+        if self.tts_provider not in ("local", "sarvam"):
+            self.tts_provider = "local"
         if self.active_model not in ("legacy", "user"):
             self.active_model = "legacy"
         return self

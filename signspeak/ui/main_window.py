@@ -887,9 +887,11 @@ class MainWindow(QMainWindow):
         if key in ("auto_word", "auto_sentence"):
             self.translate_page.set_auto(self.settings.auto_word, self.settings.auto_sentence)
             self.settings_page.set_values(self.settings)
-        if key in ("tts_voice", "tts_rate", "tts_volume") and self.speech is not None:
+        if key == "tts_language" and self.settings.tts_provider == "sarvam":
+            self.settings.tts_voice = f"sarvam:{self.settings.tts_language}"
+        if key in ("tts_provider", "tts_language", "tts_voice", "tts_rate", "tts_volume") and self.speech is not None:
             self.speech.configure(
-                voice_id=self.settings.tts_voice,
+                voice_id=(f"sarvam:{self.settings.tts_language}" if self.settings.tts_provider == "sarvam" else self.settings.tts_voice),
                 rate=self.settings.tts_rate,
                 volume=self.settings.tts_volume,
             )

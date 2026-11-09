@@ -2,14 +2,100 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
+import os
 import queue
 import sys
 import tempfile
 import threading
+from urllib.request import Request, urlopen
 from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QByteArray, QEventLoop, QIODevice, QTimer
+from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+
+
+SARVAM_LANGUAGES = {
+    "Bengali": "bn-IN", "English (India)": "en-IN", "Gujarati": "gu-IN",
+    "Hindi": "hi-IN", "Kannada": "kn-IN", "Malayalam": "ml-IN",
+    "Marathi": "mr-IN", "Odia": "od-IN", "Punjabi": "pa-IN",
+    "Tamil": "ta-IN", "Telugu": "te-IN",
+}
+
+
+class _SarvamBackend:
+    """Sarvam Bulbul TTS for Indian language speech."""
+
+    def __init__(self) -> None:
+        self.api_key = os.environ.get("SARVAM_API_KEY", "").strip()
+        self.output = QAudioOutput()
+        self.player = QMediaPlayer()
+        self.player.setAudioOutput(self.output)
+        self._buffer = None
+        self.voices = [
+            {"id": f"sarvam:{code}", "name": f"{name} · Sarvam Bulbul"}
+            for name, code in SARVAM_LANGUAGES.items()
+        ]
+
+    def apply(self, voice_id: str, rate: int, volume: int) -> None:
+        self.language = voice_id.removeprefix("sarvam:")
+        self.output.setVolume(max(0.0, min(1.0, volume / 100.0)))
+        self.pace = max(0.5, min(2.0, 1.0 + rate * 0.035))
+
+    def speak(self, text: str, cancel: threading.Event, on_start, on_done) -> None:
+        from PySide6.QtCore import QByteArray, QBuffer
+
+        try:
+            if not self.api_key:
+                raise RuntimeError("Set SARVAM_API_KEY to use Sarvam speech.")
+            if len(text) > 2500:
+                raise RuntimeError("Sarvam speech supports up to 2,500 characters per request.")
+            payload = json.dumps({
+                "text": text, "language_code": self.language,
+                "speaker": "shubh", "model": "bulbul:v3",
+                "pace": self.pace, "output_audio_codec": "wav",
+            }).encode("utf-8")
+            request = Request(
+                "https://api.sarvam.ai/text-to-speech", data=payload,
+                headers={"api-subscription-key": self.api_key, "Content-Type": "application/json"},
+            )
+            with urlopen(request, timeout=45) as response:
+                result = json.loads(response.read().decode("utf-8"))
+            if cancel.is_set():
+                return
+            audio = base64.b64decode(result["audios"][0])
+            self._buffer = QBuffer()
+            self._buffer.setData(QByteArray(audio))
+            self._buffer.open(QIODevice.OpenModeFlag.ReadOnly)
+            loop = QEventLoop()
+            timer = QTimer()
+            timer.setInterval(50)
+            timer.timeout.connect(lambda: self.player.stop() if cancel.is_set() else None)
+            timer.timeout.connect(lambda: loop.quit() if cancel.is_set() else None)
+            self.player.mediaStatusChanged.connect(
+                lambda status: loop.quit() if status == QMediaPlayer.MediaStatus.EndOfMedia else None
+            )
+            self.player.errorOccurred.connect(lambda *_: loop.quit())
+            self.player.setSourceDevice(self._buffer)
+            self.player.play()
+            timer.start()
+            on_start()
+            loop.exec()
+            timer.stop()
+            if self.player.error() != QMediaPlayer.Error.NoError:
+                raise RuntimeError(self.player.errorString() or "Audio playback failed.")
+        finally:
+            self.player.stop()
+            if self._buffer is not None:
+                self._buffer.close()
+                self._buffer = None
+            on_done()
+
+    def close(self) -> None:
+        self.player.stop()
 
 
 EDGE_VOICES = [
@@ -95,7 +181,9 @@ class _EdgeBackend:
             if cancel.is_set():
                 return
             audio_file = await StorageFile.get_file_from_path_async(str(audio_path))
-            self.player.set_source(MediaSource.create_from_storage_file(audio_file))
+            # WinRT's MediaPlayer exposes `source` as a property; unlike some
+            # playback wrappers it has no set_source() method.
+            self.player.source = MediaSource.create_from_storage_file(audio_file)
             self._loop = asyncio.get_running_loop()
             self._ended = asyncio.Event()
             self.player.play()
@@ -154,12 +242,19 @@ class SpeechWorker(QThread):
         self.wait(15000)
 
     def run(self) -> None:
-        try:
+        backend = None
+        def create_backend(voice: str):
+            if voice.startswith("sarvam:"):
+                return _SarvamBackend()
             if sys.platform == "win32" and sys.version_info >= (3, 11):
                 import edge_tts  # noqa: F401
-                backend = _EdgeBackend()
-            else:
-                backend = _Pyttsx3Backend()
+                return _EdgeBackend()
+            return _Pyttsx3Backend()
+
+        try:
+            with self._lock:
+                initial_voice = self._voice_id
+            backend = create_backend(initial_voice)
         except Exception as exc:
             self.voicesReady.emit([])
             self.failed.emit(f"Speech is unavailable: {exc}")
@@ -177,6 +272,11 @@ class SpeechWorker(QThread):
                 with self._lock:
                     voice_id, rate, volume = self._voice_id, self._rate, self._volume
                 try:
+                    sarvam = voice_id.startswith("sarvam:")
+                    if sarvam != isinstance(backend, _SarvamBackend):
+                        backend.close()
+                        backend = create_backend(voice_id)
+                        self.voicesReady.emit(list(backend.voices))
                     backend.apply(voice_id, rate, volume)
                     backend.speak(
                         payload,
@@ -188,7 +288,8 @@ class SpeechWorker(QThread):
                     self.failed.emit(f"Speech failed: {exc}")
                     self.speakingChanged.emit(False)
         finally:
-            backend.close()
+            if backend is not None:
+                backend.close()
 
 
 class SpeechEngine(QObject):
