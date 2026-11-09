@@ -1,10 +1,11 @@
-PySide6>=6.7
+Flask>=3.0.0
 mediapipe>=0.10.20
 opencv-python>=4.10; platform_system == "Windows"
 opencv-python-headless>=4.10; platform_system != "Windows"
 numpy>=1.26
 scikit-learn>=1.5
 joblib>=1.4
+PySide6>=6.7
 edge-tts>=7.0; platform_system == "Windows" and python_version >= "3.11"
 pyttsx3>=2.98
 winrt-runtime>=4; platform_system == "Windows" and python_version >= "3.11"

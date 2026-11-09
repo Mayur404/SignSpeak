@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SignSpeak — 5G Edge ASL Recognition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070A10;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(255, 255, 255, 0.12);
+      --cyan: #22D3EE;
+      --cyan-glow: rgba(34, 211, 238, 0.35);
+      --emerald: #10B981;
+      --emerald-glow: rgba(16, 185, 129, 0.3);
+      --violet: #8B5CF6;
+      --violet-glow: rgba(139, 92, 246, 0.3);
+      --coral: #F43F5E;
+      --amber: #F59E0B;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(ellipse at 15% 0%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 10%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 100%, rgba(16, 185, 129, 0.05) 0%, transparent 60%);
+    }
+
+    /* Top Navigation */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--cyan), var(--violet));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, #FFFFFF, #CBD5E1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-badge {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(34, 211, 238, 0.12);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      color: var(--cyan);
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 10px var(--emerald);
+      animation: pulse 2s infinite;
+    }
+
+    .pulse-dot.offline {
+      background: var(--coral);
+      box-shadow: 0 0 10px var(--coral);
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .nav-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-family: inherit;
+    }
+
+    .btn:hover {
+      background: var(--card-hover);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--cyan), #0284C7);
+      color: #070A10;
+      font-weight: 600;
+      border: none;
+      box-shadow: 0 0 12px var(--cyan-glow);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.92;
+      box-shadow: 0 0 20px var(--cyan-glow);
+    }
+
+    .btn-emerald {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: var(--emerald);
+    }
+
+    .btn-emerald:hover {
+      background: rgba(16, 185, 129, 0.25);
+    }
+
+    .btn-coral {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: var(--coral);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.78rem;
+    }
+
+    /* Main Grid Layout */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 20px;
+      padding: 20px;
+      max-width: 1720px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    @media (max-width: 1024px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    /* Video Column */
+    .stream-column {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .card-title {
+      font-size: 0.92rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+    }
+
+    .video-viewport {
+      position: relative;
+      background: #000;
+      aspect-ratio: 16 / 9;
+      width: 100%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-viewport img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .camera-switcher-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 16px;
+      background: rgba(11, 15, 25, 0.6);
+      border-top: 1px solid var(--card-border);
+    }
+
+    .preset-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .preset-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+    }
+
+    .preset-btn:hover {
+      background: var(--card-hover);
+      color: var(--text);
+    }
+
+    .preset-btn.active {
+      background: rgba(34, 211, 238, 0.15);
+      border-color: var(--cyan);
+      color: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    /* Recognition HUD below stream */
+    .hud-metrics {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: rgba(11, 15, 25, 0.4);
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+    }
+
+    .sign-badge {
+      width: 72px;
+      height: 72px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.15), rgba(139, 92, 246, 0.15));
+      border: 2px solid var(--cyan);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px var(--cyan-glow);
+      transition: all 0.2s ease;
+    }
+
+    .sign-badge.stable {
+      border-color: var(--emerald);
+      box-shadow: 0 0 25px var(--emerald-glow);
+    }
+
+    .sign-char {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #FFF;
+      line-height: 1;
+      font-family: var(--font-mono);
+    }
+
+    .sign-sub {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .meter-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .meter-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .progress-bar-bg {
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), var(--emerald));
+      border-radius: 4px;
+      transition: width 0.1s linear;
+    }
+
+    .hold-meter-bg {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .hold-meter-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      transition: width 0.08s linear;
+    }
+
+    .predictions-box {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 140px;
+    }
+
+    .prediction-chip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+    }
+
+    /* Right Column: Transcription & Speech */
+    .transcription-column {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .word-preview-box {
+      padding: 20px;
+      text-align: center;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.8), rgba(11, 15, 25, 0.9));
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .spelling-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--cyan);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .current-word {
+      font-size: 2.8rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      min-height: 54px;
+      font-family: var(--font-mono);
+      background: linear-gradient(90deg, #FFFFFF, var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 24px var(--cyan-glow);
+    }
+
+    .current-word.empty {
+      color: var(--text-dim);
+      -webkit-text-fill-color: var(--text-dim);
+      font-size: 1.8rem;
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .transcript-box {
+      flex: 1;
+      min-height: 180px;
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 16px;
+      font-size: 1.05rem;
+      line-height: 1.6;
+      color: #E2E8F0;
+      font-family: inherit;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: rgba(7, 10, 16, 0.6);
+    }
+
+    .transcript-box:empty::before {
+      content: "Recognized sentences will appear here. Start signing or type letters below...";
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    .action-pad {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      padding: 14px;
+      background: rgba(11, 15, 25, 0.6);
+      border-top: 1px solid var(--card-border);
+    }
+
+    /* Virtual Keyboard */
+    .v-keyboard-section {
+      padding: 12px 14px;
+      background: rgba(11, 15, 25, 0.5);
+      border-top: 1px solid var(--card-border);
+    }
+
+    .v-keyboard-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .v-keyboard-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 4px;
+    }
+
+    .v-key {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      color: var(--text);
+      transition: all 0.1s ease;
+    }
+
+    .v-key:hover {
+      background: rgba(34, 211, 238, 0.2);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .v-key:active {
+      transform: scale(0.92);
+    }
+
+    /* Speech & Audio Controls */
+    .speech-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .control-label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    select, input[type="text"], input[type="range"] {
+      font-family: inherit;
+    }
+
+    select {
+      background: #0B0F19;
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      outline: none;
+      max-width: 220px;
+    }
+
+    /* Modals & Dialogs */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #0B0F19;
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 780px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-body {
+      padding: 20px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #CBD5E1;
+    }
+
+    .dict-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .dict-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .dict-char {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--cyan);
+      font-family: var(--font-mono);
+    }
+
+    .dict-hint {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .guide-callout {
+      background: rgba(34, 211, 238, 0.08);
+      border-left: 3px solid var(--cyan);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 14px 0;
+      font-size: 0.85rem;
+    }
+
+    .code-block {
+      background: #070A10;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--cyan);
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+
+    /* Switch toggles */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+    }
+
+    .switch input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: rgba(255, 255, 255, 0.15);
+      transition: .2s;
+      border-radius: 22px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider { background-color: var(--cyan); }
+    input:checked + .slider:before { transform: translateX(18px); }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header>
+    <a href="/" class="brand">
+      <div class="brand-icon">🤟</div>
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="brand-title">SignSpeak</span>
+          <span class="brand-badge">5G MEC EDGE</span>
+        </div>
+        <div style="font-size: 0.7rem; color: var(--text-dim);">ASL & Gesture to Speech System</div>
+      </div>
+    </a>
+
+    <div class="header-status">
+      <div class="status-pill">
+        <div id="connDot" class="pulse-dot"></div>
+        <span id="connStatus">Camera Live</span>
+      </div>
+      <div class="status-pill" id="fpsDisplay">-- FPS</div>
+      <div class="status-pill" id="modelDisplay">Model: Extra Trees (99.4%)</div>
+    </div>
+
+    <div class="nav-actions">
+      <button class="btn btn-sm" onclick="togglePause()" id="pauseBtn">⏸ Pause</button>
+      <button class="btn btn-sm" onclick="openModal('guideModal')">📘 Sign Guide</button>
+      <button class="btn btn-sm" onclick="openModal('netModal')">🌐 5G Lab Setup</button>
+      <button class="btn btn-sm" onclick="openModal('settingsModal')">⚙️ Settings</button>
+    </div>
+  </header>
+
+  <!-- Main Grid -->
+  <main>
+    <!-- Left Column: Video & Recognition HUD -->
+    <div class="stream-column">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>📹 Live Video Feed</span>
+            <span style="font-size: 0.72rem; color: var(--text-dim);" id="streamResBadge">1280x720</span>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-sm" onclick="takeSnapshot()">📸 Snapshot</button>
+            <button class="btn btn-sm" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+          </div>
+        </div>
+
+        <div class="video-viewport" id="videoContainer">
+          <img id="liveFeed" src="/video_feed" alt="Camera Stream" onerror="handleStreamError()">
+        </div>
+
+        <!-- Camera Switcher Presets -->
+        <div class="camera-switcher-bar">
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">SOURCE:</span>
+          <div class="preset-group">
+            <button class="preset-btn active" id="btnPreset5G" onclick="switchCameraPreset('5g')">⚡ 5G Modem (10.101.0.70)</button>
+            <button class="preset-btn" id="btnPresetEth" onclick="switchCameraPreset('ethernet')">🔌 Direct Ethernet (192.168.128.10)</button>
+            <button class="preset-btn" id="btnPresetWebcam" onclick="switchCameraPreset('webcam')">💻 Webcam 0</button>
+            <button class="preset-btn" onclick="openCustomCamPrompt()">✏️ Custom...</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Detection Metrics HUD -->
+      <div class="hud-metrics">
+        <!-- Big Sign Character Badge -->
+        <div class="sign-badge" id="signBadge">
+          <div class="sign-char" id="signChar">—</div>
+          <div class="sign-sub" id="signSub">NONE</div>
+        </div>
+
+        <!-- Meters: Confidence & Hold Progress -->
+        <div class="meter-section">
+          <div>
+            <div class="meter-label-row">
+              <span>Confidence</span>
+              <span id="confValue" style="color: var(--cyan); font-weight: 600;">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="confBar"></div>
+            </div>
+          </div>
+          <div>
+            <div class="meter-label-row">
+              <span>Hold-to-Type Progress</span>
+              <span id="holdValue" style="color: var(--emerald); font-weight: 600;">0%</span>
+            </div>
+            <div class="hold-meter-bg">
+              <div class="hold-meter-fill" id="holdBar"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Alternative Predictions -->
+        <div class="predictions-box" id="topPredictionsBox">
+          <div class="prediction-chip"><span>—</span><span>0%</span></div>
+          <div class="prediction-chip"><span>—</span><span>0%</span></div>
+          <div class="prediction-chip"><span>—</span><span>0%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Transcription & Speech -->
+    <div class="transcription-column">
+      <div class="card" style="flex: 1;">
+        <div class="card-header">
+          <div class="card-title">
+            <span>💬 Live Transcription</span>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-sm btn-emerald" onclick="speakCurrentText()">🔊 Speak Now</button>
+            <button class="btn btn-sm" onclick="copyTranscript()">📋 Copy</button>
+            <button class="btn btn-sm btn-coral" onclick="clearTranscript()">🗑 Clear</button>
+          </div>
+        </div>
+
+        <!-- Word Being Spelled (Huge animated letters) -->
+        <div class="word-preview-box">
+          <div class="spelling-label">Active Word Buffer</div>
+          <div class="current-word empty" id="activeWordDisplay">[waiting for sign]</div>
+        </div>
+
+        <!-- Full Spoken Transcript -->
+        <div class="transcript-box" id="transcriptDisplay"></div>
+
+        <!-- Action Pad (Quick Gestures / Buttons) -->
+        <div class="action-pad">
+          <button class="btn" onclick="sendAction('space')">␣ Space (👍)</button>
+          <button class="btn" onclick="sendAction('period')">. Period (🤟)</button>
+          <button class="btn btn-coral" onclick="sendAction('backspace')">⌫ Backspace (✋)</button>
+          <button class="btn btn-primary" onclick="sendAction('commit_now')">⚡ Commit Now</button>
+        </div>
+
+        <!-- Virtual ASL Keyboard (A-Z, 0-9) -->
+        <div class="v-keyboard-section">
+          <div class="v-keyboard-title">
+            <span>Manual Sign / Letter Assist</span>
+            <span>Click letter to inject</span>
+          </div>
+          <div class="v-keyboard-grid" id="virtualKeyboard">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <!-- Browser Speech Synthesis Controls -->
+        <div class="speech-controls">
+          <div class="control-row">
+            <span class="control-label">Speech Voice (Web Speech API):</span>
+            <select id="voiceSelect" onchange="updateVoice()"></select>
+          </div>
+          <div class="control-row">
+            <span class="control-label">Auto-speak word on Space (thumbs-up):</span>
+            <label class="switch">
+              <input type="checkbox" id="autoWordCheck" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="control-row">
+            <span class="control-label">Auto-speak sentence on Period (ILY sign):</span>
+            <label class="switch">
+              <input type="checkbox" id="autoSentenceCheck" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ASL Dictionary Modal -->
+  <div class="modal-overlay" id="guideModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 600;">📘 ASL & Gesture Reference Guide</h3>
+        <button class="btn btn-sm" onclick="closeModal('guideModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>Hold a hand shape steady for <strong>0.5 seconds</strong> to type. The system recognizes the full ASL alphabet (A-Z), digits (0-9), and special control gestures:</p>
+
+        <div class="guide-callout">
+          <strong>Special Navigation Gestures:</strong><br>
+          • <strong>Thumbs Up</strong> = Add Space (finishes the current word and triggers word speech)<br>
+          • <strong>I Love You (🤟)</strong> = Add Period (finishes sentence and triggers full speech)<br>
+          • <strong>Open Palm Wave</strong> = Backspace (deletes previous letter)
+        </div>
+
+        <div class="dict-grid" id="dictCardsGrid">
+          <!-- Populated from /api/dictionary -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5G Lab Setup Modal -->
+  <div class="modal-overlay" id="netModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 600;">🌐 5G Lab & Network Architecture</h3>
+        <button class="btn btn-sm" onclick="closeModal('netModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>SignSpeak is optimized for the private 5G Multi-access Edge Computing (MEC) lab at IIIT Dharwad (EC368). The Sparsh camera transmits over the lab's 5G network to the edge server VM (<code>172.16.0.10</code>).</p>
+
+        <div class="guide-callout">
+          <strong>⚠️ Finding the 5G Camera WAN IP:</strong><br>
+          1. The 5G modem assigns a dynamic WAN IP upon reconnecting (e.g. <code>10.101.0.70</code>).<br>
+          2. The modem admin page (<code>192.168.128.1</code>) is <strong>NOT</strong> accessible from Wi-Fi or over 5G.<br>
+          3. You <strong>MUST</strong> connect your laptop directly to the modem via an <strong>Ethernet cable</strong>.<br>
+          4. Set your laptop static IP to <code>192.168.128.100</code>, mask <code>255.255.255.0</code>.<br>
+          5. Open <code>http://192.168.128.1</code> in your browser, check the 5G WAN IP, and update <code>CAMERA_HOST</code> in <code>.env</code>.
+        </div>
+
+        <h4 style="margin-top: 14px; color: var(--text);">Direct RTSP Stream Paths (Sparsh Topsvision v2.1):</h4>
+        <div class="code-block">
+Substream (720p - Recommended):<br>
+rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=1.sdp<br><br>
+Mainstream (4K):<br>
+rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=0.sdp
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-content" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 600;">⚙️ Recognition & System Settings</h3>
+        <button class="btn btn-sm" onclick="closeModal('settingsModal')">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+        <div>
+          <label style="font-size: 0.85rem; font-weight: 500; display: block; margin-bottom: 6px;">Camera Source (RTSP URL or Webcam Index):</label>
+          <input type="text" id="settingCamSource" style="width: 100%; padding: 8px 12px; background: #070A10; border: 1px solid var(--card-border); color: #FFF; border-radius: 6px;">
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px;">
+            <span>Hold Duration (ms):</span>
+            <span id="valHoldMs" style="color: var(--cyan); font-family: var(--font-mono);">500 ms</span>
+          </div>
+          <input type="range" id="settingHoldMs" min="150" max="1500" step="50" value="500" style="width: 100%;" oninput="document.getElementById('valHoldMs').textContent = this.value + ' ms'">
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px;">
+            <span>Confidence Cutoff:</span>
+            <span id="valConf" style="color: var(--cyan); font-family: var(--font-mono);">0.55</span>
+          </div>
+          <input type="range" id="settingConf" min="0.20" max="0.90" step="0.05" value="0.55" style="width: 100%;" oninput="document.getElementById('valConf').textContent = this.value">
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.85rem;">Mirror Camera Horizontally:</span>
+          <label class="switch">
+            <input type="checkbox" id="settingMirror" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.85rem;">Active AI Model:</span>
+          <select id="settingModelSelect" style="max-width: 180px;">
+            <option value="user">Personal Model (99.4%)</option>
+            <option value="legacy">Bundled Legacy ASL</option>
+          </select>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+          <button class="btn btn-sm" onclick="closeModal('settingsModal')">Cancel</button>
+          <button class="btn btn-sm btn-primary" onclick="saveSettings()">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let lastSpokenSentence = "";
+    let synth = window.speechSynthesis;
+    let selectedVoice = null;
+    let isPaused = false;
+
+    // Load available Web Speech API voices
+    function loadVoices() {
+      if (!synth) return;
+      const voices = synth.getVoices();
+      const select = document.getElementById("voiceSelect");
+      select.innerHTML = "";
+
+      voices.forEach((voice, index) => {
+        const option = document.createElement("option");
+        option.value = index;
+        option.textContent = `${voice.name} (${voice.lang})${voice.default ? ' — Default' : ''}`;
+        select.appendChild(option);
+
+        // Prefer English / Indian English natural voices
+        if (!selectedVoice && (voice.lang.includes("en-IN") || voice.lang.includes("en-US"))) {
+          option.selected = true;
+          selectedVoice = voice;
+        }
+      });
+      if (!selectedVoice && voices.length > 0) {
+        selectedVoice = voices[0];
+      }
+    }
+
+    if (synth) {
+      loadVoices();
+      if (synth.onvoiceschanged !== undefined) {
+        synth.onvoiceschanged = loadVoices;
+      }
+    }
+
+    function updateVoice() {
+      const select = document.getElementById("voiceSelect");
+      const voices = synth.getVoices();
+      selectedVoice = voices[select.value] || null;
+    }
+
+    function speakText(text) {
+      if (!synth || !text || !text.trim()) return;
+      // Cancel previous utterance if any to keep zero latency
+      synth.cancel();
+      const utterance = new SpeechSynthesisUtterance(text.trim());
+      if (selectedVoice) utterance.voice = selectedVoice;
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      synth.speak(utterance);
+    }
+
+    function speakCurrentText() {
+      const transcript = document.getElementById("transcriptDisplay").textContent;
+      const word = document.getElementById("activeWordDisplay").textContent;
+      const toSpeak = (transcript + " " + (word.startsWith("[") ? "" : word)).trim();
+      speakText(toSpeak || "No text transcribed yet");
+    }
+
+    // Populate Virtual Alphabet Keyboard (A-Z, 0-9)
+    const keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
+    const kbContainer = document.getElementById("virtualKeyboard");
+    keys.forEach(k => {
+      const btn = document.createElement("button");
+      btn.className = "v-key";
+      btn.textContent = k;
+      btn.onclick = () => sendAction("type", k);
+      kbContainer.appendChild(btn);
+    });
+
+    // Polling API Status Loop (200ms)
+    async function pollStatus() {
+      try {
+        const res = await fetch("/api/status");
+        if (!res.ok) throw new Error("Status failed");
+        const data = await res.json();
+        updateUI(data);
+      } catch (err) {
+        document.getElementById("connDot").className = "pulse-dot offline";
+        document.getElementById("connStatus").textContent = "Connecting...";
+      }
+      setTimeout(pollStatus, 250);
+    }
+
+    function updateUI(data) {
+      // 1. Connection & FPS
+      const cam = data.camera;
+      const connDot = document.getElementById("connDot");
+      const connStatus = document.getElementById("connStatus");
+      if (cam.connected) {
+        connDot.className = "pulse-dot";
+        connStatus.textContent = cam.source;
+      } else {
+        connDot.className = "pulse-dot offline";
+        connStatus.textContent = cam.error ? "Offline" : "Reconnecting...";
+      }
+      document.getElementById("fpsDisplay").textContent = `${cam.fps} FPS`;
+      document.getElementById("streamResBadge").textContent = `${cam.width}x${cam.height}`;
+
+      // 2. Model info
+      if (data.model && data.model.name) {
+        document.getElementById("modelDisplay").textContent = `${data.model.algorithm} (${data.model.accuracy || 99.4}%)`;
+      }
+
+      // 3. Recognition HUD
+      const rec = data.recognition;
+      const signBadge = document.getElementById("signBadge");
+      const signChar = document.getElementById("signChar");
+      const signSub = document.getElementById("signSub");
+      const confBar = document.getElementById("confBar");
+      const confVal = document.getElementById("confValue");
+      const holdBar = document.getElementById("holdBar");
+      const holdVal = document.getElementById("holdValue");
+
+      if (rec.hand_present && rec.display_name) {
+        signChar.textContent = rec.display_name;
+        signSub.textContent = rec.is_stable ? "LOCKED" : "HOLDING";
+        signBadge.className = rec.is_stable ? "sign-badge stable" : "sign-badge";
+        const confPct = Math.round(rec.confidence * 100);
+        confBar.style.width = `${confPct}%`;
+        confVal.textContent = `${confPct}%`;
+        const holdPct = Math.round(rec.hold_progress * 100);
+        holdBar.style.width = `${holdPct}%`;
+        holdVal.textContent = `${holdPct}%`;
+      } else {
+        signChar.textContent = "—";
+        signSub.textContent = "NO HAND";
+        signBadge.className = "sign-badge";
+        confBar.style.width = "0%";
+        confVal.textContent = "0%";
+        holdBar.style.width = "0%";
+        holdVal.textContent = "0%";
+      }
+
+      // Top predictions
+      const predsBox = document.getElementById("topPredictionsBox");
+      if (rec.top && rec.top.length > 0) {
+        predsBox.innerHTML = rec.top.slice(0, 3).map(p => 
+          `<div class="prediction-chip"><span>${p.label}</span><span>${Math.round(p.confidence * 100)}%</span></div>`
+        ).join("");
+      }
+
+      // 4. Word and Transcript
+      const comp = data.composer;
+      const wordDisplay = document.getElementById("activeWordDisplay");
+      if (comp.word) {
+        wordDisplay.textContent = comp.word;
+        wordDisplay.className = "current-word";
+      } else {
+        wordDisplay.textContent = "[waiting for sign]";
+        wordDisplay.className = "current-word empty";
+      }
+
+      const transcriptBox = document.getElementById("transcriptDisplay");
+      if (transcriptBox.textContent !== comp.transcript) {
+        transcriptBox.textContent = comp.transcript;
+        transcriptBox.scrollTop = transcriptBox.scrollHeight;
+      }
+
+      // 5. Check Speech Events (Trigger speech for newly committed words/sentences)
+      if (data.events && data.events.length > 0) {
+        data.events.forEach(ev => {
+          const autoWord = document.getElementById("autoWordCheck").checked;
+          const autoSentence = document.getElementById("autoSentenceCheck").checked;
+
+          if (ev.kind === "space" && autoWord && ev.speak_word) {
+            speakText(ev.speak_word);
+          } else if (ev.kind === "period" && autoSentence && ev.speak_sentence) {
+            speakText(ev.speak_sentence);
+          } else if (ev.kind === "word" && autoWord && ev.speak_word) {
+            speakText(ev.speak_word);
+          }
+        });
+      }
+    }
+
+    // Actions
+    async function sendAction(action, param = "") {
+      try {
+        const res = await fetch("/api/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, param })
+        });
+        const data = await res.json();
+        if (data.result) {
+          if (data.result.speak_word && document.getElementById("autoWordCheck").checked) {
+            speakText(data.result.speak_word);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function clearTranscript() {
+      sendAction("clear");
+      document.getElementById("transcriptDisplay").textContent = "";
+      document.getElementById("activeWordDisplay").textContent = "[waiting for sign]";
+      document.getElementById("activeWordDisplay").className = "current-word empty";
+    }
+
+    function copyTranscript() {
+      const text = document.getElementById("transcriptDisplay").textContent;
+      navigator.clipboard.writeText(text);
+      alert("Transcript copied to clipboard!");
+    }
+
+    async function switchCameraPreset(preset) {
+      document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+      if (preset === "5g") document.getElementById("btnPreset5G").classList.add("active");
+      if (preset === "ethernet") document.getElementById("btnPresetEth").classList.add("active");
+      if (preset === "webcam") document.getElementById("btnPresetWebcam").classList.add("active");
+
+      await fetch("/api/camera", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preset })
+      });
+    }
+
+    async function openCustomCamPrompt() {
+      const url = prompt("Enter RTSP URL, device index (e.g. 0), or test video path:");
+      if (url && url.trim()) {
+        document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+        await fetch("/api/camera", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: url.trim() })
+        });
+      }
+    }
+
+    async function togglePause() {
+      const res = await fetch("/api/pause", { method: "POST" });
+      const data = await res.json();
+      isPaused = data.paused;
+      document.getElementById("pauseBtn").textContent = isPaused ? "▶ Resume" : "⏸ Pause";
+    }
+
+    function toggleFullscreen() {
+      const el = document.getElementById("videoContainer");
+      if (!document.fullscreenElement) {
+        el.requestFullscreen().catch(err => alert(err.message));
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function takeSnapshot() {
+      const img = document.getElementById("liveFeed");
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth || 1280;
+      canvas.height = img.naturalHeight || 720;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const link = document.createElement("a");
+      link.download = `signspeak_snapshot_${Date.now()}.jpg`;
+      link.href = canvas.toDataURL("image/jpeg", 0.9);
+      link.click();
+    }
+
+    function handleStreamError() {
+      console.warn("Stream interrupted, reconnecting...");
+      setTimeout(() => {
+        document.getElementById("liveFeed").src = "/video_feed?t=" + Date.now();
+      }, 1500);
+    }
+
+    // Modals
+    function openModal(id) {
+      document.getElementById(id).classList.add("open");
+      if (id === "guideModal" && document.getElementById("dictCardsGrid").children.length === 0) {
+        loadDictionary();
+      }
+      if (id === "settingsModal") {
+        fetch("/api/status").then(r => r.json()).then(d => {
+          document.getElementById("settingCamSource").value = d.camera.raw_source || "";
+          document.getElementById("settingHoldMs").value = d.settings.hold_ms || 500;
+          document.getElementById("valHoldMs").textContent = (d.settings.hold_ms || 500) + " ms";
+          document.getElementById("settingConf").value = d.settings.confidence || 0.55;
+          document.getElementById("valConf").textContent = d.settings.confidence || 0.55;
+          document.getElementById("settingMirror").checked = d.settings.mirror !== false;
+          document.getElementById("settingModelSelect").value = d.settings.active_model || "user";
+        });
+      }
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove("open");
+    }
+
+    async function loadDictionary() {
+      try {
+        const res = await fetch("/api/dictionary");
+        const data = await res.json();
+        const grid = document.getElementById("dictCardsGrid");
+        grid.innerHTML = data.vocabulary.map(v => `
+          <div class="dict-card">
+            <div class="dict-char">${v.display}</div>
+            <div class="dict-hint">${v.hint}</div>
+          </div>
+        `).join("");
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function saveSettings() {
+      const source = document.getElementById("settingCamSource").value.trim();
+      const hold_ms = parseInt(document.getElementById("settingHoldMs").value);
+      const confidence = parseFloat(document.getElementById("settingConf").value);
+      const mirror = document.getElementById("settingMirror").checked;
+      const model = document.getElementById("settingModelSelect").value;
+
+      await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hold_ms, confidence, mirror, camera_source: source })
+      });
+
+      await fetch("/api/model", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: model })
+      });
+
+      if (source) {
+        await fetch("/api/camera", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source })
+        });
+      }
+
+      closeModal("settingsModal");
+    }
+
+    // Start status polling
+    pollStatus();
+  </script>
+</body>
+</html>

@@ -143,6 +143,10 @@ class TextComposer:
         self.tokens.clear()
         self.word = ""
 
+    def clear(self) -> None:
+        """Alias for clear_all."""
+        self.clear_all()
+
     def load(self, transcript: str, word: str = "") -> None:
         self.tokens = [token for token in transcript.replace(".", " . ").split() if token]
         self.word = word

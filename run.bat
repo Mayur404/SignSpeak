@@ -20,7 +20,8 @@ if not exist "%PYTHON%" (
     if errorlevel 1 goto :error
 )
 
-"%PYTHON%" app.py %*
+echo Starting SignSpeak Web UI on port 8080...
+"%PYTHON%" app.py --host 0.0.0.0 --port 8080 %*
 if errorlevel 1 goto :error
 exit /b 0
 

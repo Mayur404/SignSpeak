@@ -1,11 +1,11 @@
 {
   "camera_index": 0,
-  "camera_source": "rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=1.sdp",
+  "camera_source": "0",
   "mirror": true,
   "inference_width": 800,
-  "capture_delay": 2.0,
+  "capture_delay": 3.0,
   "confidence": 0.55,
-  "hold_ms": 500,
+  "hold_ms": 650,
   "smoothing": 8,
   "min_vote_ratio": 0.6,
   "cooldown_ms": 200,
@@ -13,12 +13,12 @@
   "auto_word": true,
   "auto_sentence": true,
   "speak_letters": false,
-  "tts_voice": "sarvam:kn-IN",
-  "tts_provider": "sarvam",
-  "tts_language": "kn-IN",
+  "tts_voice": "",
+  "tts_provider": "local",
+  "tts_language": "hi-IN",
   "tts_rate": 0,
   "tts_volume": 100,
   "draw_overlay": true,
   "show_fps": true,
-  "active_model": "user"
+  "active_model": "legacy"
 }

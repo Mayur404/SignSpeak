@@ -1,212 +1,223 @@
 # SignSpeak
 
-SignSpeak watches a video stream for American Sign Language (ASL) and custom hand gestures,
-translates them into characters, words, and sentences in real time, and speaks them aloud.
-It was built for the private 5G lab at IIIT Dharwad (EC368).
+SignSpeak watches a video stream for American Sign Language (ASL) fingerspelling and hand gestures,
+translates them into characters, words, and sentences in real time, and speaks them aloud using
+native web speech synthesis. It was built for the private 5G lab at IIIT Dharwad (EC368).
 
-In the lab, the camera video travels over the 5G network from an edge Sparsh CCTV camera
-to an edge server / VM (`172.16.0.10` / `172.16.0.11`). The server runs real-time MediaPipe
-dual-hand landmark tracking, temporal voting, and machine learning inference directly at
-the edge to keep gesture translation fast and responsive.
+There, a high-definition Sparsh CCTV camera transmits its video feed over the lab's dedicated 5G
+wireless network to a server at the edge of that network (`172.16.0.10`), and the server does the
+MediaPipe tracking and machine learning inference. Keeping the work at the edge keeps latency minimal:
+from holding a hand shape to your phone or laptop speaking the word is under half a second.
 
-![SignSpeak Translate Screen](screenshots/translate_real.png)
+The interface is a web dashboard running on **port 8080**. Anyone connected to the lab Wi-Fi or edge
+network can open `http://172.16.0.10:8080` (or `http://localhost:8080` on a laptop) on their phone,
+tablet, or PC to view the live annotated video stream, compose sentences, and hear speech synthesis
+directly through their own device's speakers.
+
+---
 
 ## What it does
 
-- Tracks up to two hands at once in real time using MediaPipe Tasks (video mode).
-- Translates static ASL alphabet (A-Z) and digits (0-9) using a calibrated classifier.
-- Supports **personal model training**: record your own handshapes, custom words/phrases,
-  and a custom backspace gesture directly from the UI.
-- Stabilizes signs with sliding-window temporal voting, hold-to-type ring, and release-to-repeat
-  detection so you don't get accidental duplicate letters.
-- Composes words and sentences with automated speech synthesis (Edge TTS, Windows SAPI,
-  Linux system voices, or optional Sarvam AI for 11 Indian languages).
-- Automatically connects to **5G network RTSP cameras** (Sparsh SC-IM82NP series) as well as
-  local USB webcams.
+- Looks at the camera picture at up to 30 frames a second with MediaPipe dual-hand landmark detection
+  and a 35-class Extra Trees model (**99.4% validation accuracy**).
+- Detects the full ASL alphabet (A–Z) and digits (0–9).
+- Renders a real-time HUD directly on the video feed: dual-hand skeletons with colored bone links,
+  joint highlights, corner framing brackets, confidence badge, and a circular hold-to-type countdown ring.
+- Navigation & control gestures:
+  - **Thumbs Up (`👍`)**: Commits Space, finishes current word, and triggers word-level speech synthesis.
+  - **I Love You (`🤟`)**: Commits Period (`.`), finishes sentence, and triggers full sentence speech.
+  - **Open Palm Wave (`✋`)**: Backspace (deletes previous letter).
+- Built-in Browser Speech Synthesis (Web Speech API): Plays audio directly on your phone or laptop speakers
+  with zero latency and natural voice selection without needing audio drivers on the server.
+- One-click camera switcher: Switch seamlessly between the **5G RTSP stream** (`10.101.0.70`), **Direct Ethernet RTSP**
+  (`192.168.128.10`), local **Webcam 0**, or custom RTSP URLs.
+
+---
 
 ## What's in this folder
 
 | Item | What it is |
 |---|---|
-| `app.py` | Main application entry point. Run this to start the app. |
-| `run.bat` | One-click Windows starter. Sets up the venv if missing and launches the app. |
-| `run.sh`, `setup_ubuntu.sh` | Linux / Ubuntu VM launcher and dependency installer. |
-| `signmodel.joblib` | Pre-trained sign language model ready to load. |
-| `data/` | User settings (`settings.json`), trained model (`user_model.joblib`), and recordings (`user_dataset.npz`). |
-| `signspeak/` | Python source code: vision pipeline, recognition engine, trainer, composer, UI. |
-| `assets/models/` | Hand landmarker model (`hand_landmarker.task`) and bundled legacy model (`asl_legacy_rf.pkl`). |
-| `assets/` | Alphabet charts and gesture guide images. |
-| `requirements.txt` | Python library dependencies. |
-| `tests/` | Automated unit test suite (`test_core.py`). |
+| `app.py` | The program. Starts the Web Dashboard on port 8080. |
+| `start.sh` | Starts the program in the background on the 5G edge server. |
+| `stop.sh` | Stops the background program cleanly. |
+| `run.sh` | Starts the program in the foreground (Linux / Mac). |
+| `run.bat` | One-click Windows starter. |
+| `signmodel.joblib` | The 35-class Extra Trees model (17.6 MB, 99.4% accuracy). |
+| `signspeak/web/` | Web application: MJPEG video streamer, REST API, modern HTML5/JS dashboard. |
+| `signspeak/` | Core Python engine: vision pipeline, hand tracking, recognition, composer. |
+| `assets/models/` | MediaPipe hand landmarker (`hand_landmarker.task`) and bundled legacy model. |
+| `data/` | User settings (`settings.json`), trained model (`user_model.joblib`), recordings. |
+| `.env` / `.env.example` | Network settings: camera IP (`CAMERA_HOST`) and web port (`8080`). |
+| `requirements.txt` | Python dependencies (Flask, OpenCV, MediaPipe, scikit-learn, numpy). |
+| `tests/` | Automated unit test suite (`test_core.py`, `test_web.py`). |
 
 ---
 
 ## Try it on your own laptop
 
-You don't need the 5G lab or a CCTV camera to test. You can run SignSpeak on your laptop
-with any built-in or USB webcam.
+You don't need the 5G lab or a CCTV camera for this. You can run SignSpeak on your laptop with any
+built-in webcam or USB camera and access the web UI from your laptop or your phone.
 
-### On Windows
-
-1. Install Python 3.10 or newer (Python 3.12 recommended).
-2. Open PowerShell in this `SignSpeak` folder.
-3. Run the setup and start:
-   ```powershell
-   python -m venv .venv
-   .\.venv\Scripts\python.exe -m pip install --upgrade pip
-   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-   .\.venv\Scripts\python.exe app.py
-   ```
-   *(Or simply double-click `run.bat`)*
-
-### On Linux / Ubuntu
-
-1. Open terminal in this folder and install dependencies:
+1. Install Python 3.10 or newer (Python 3.12 recommended). Check with:
    ```bash
-   chmod +x setup_ubuntu.sh run.sh
-   ./setup_ubuntu.sh
-   ./run.sh
+   python3 --version
    ```
-
-Within a few seconds, the SignSpeak window opens. Place your hand in front of the camera,
-hold an ASL letter steady, and watch it type onto the screen.
+2. Open a terminal in this `SignSpeak` folder and install the dependencies:
+   ```bash
+   python3 -m pip install -r requirements.txt
+   ```
+3. Start the program:
+   * On Linux / Mac:
+     ```bash
+     python3 app.py
+     ```
+     *(Or `./run.sh`)*
+   * On Windows:
+     ```cmd
+     run.bat
+     ```
+     *(Or `python app.py`)*
+4. Open **http://localhost:8080** in your web browser.
+5. **Connect from your phone on the same Wi-Fi**:
+   Find your laptop's local IP address (e.g. `192.168.1.45`) and open:
+   ```text
+   http://192.168.1.45:8080
+   ```
+   The camera feed and transcript will load on your phone, and speech will play right from your phone's speakers!
 
 ---
 
 ## Running it in the 5G lab
 
-In the lab, SignSpeak runs on the edge server / VM at `172.16.0.10` (or `172.16.0.11`).
-Because SignSpeak has a graphical interface, you run it inside the VM's desktop environment.
+In the lab, SignSpeak runs on the edge server VM at `172.16.0.10` (or `172.16.0.11`), in the folder
+`~/5Gusecase/SignSpeak` (or `~/SignSpeak`). That server sits right behind the 5G core UPF gateway (`172.16.0.7`),
+so any video the 5G camera sends has crossed the private 5G air interface.
 
-### Accessing the VM UI
-
-1. Open your lab VM dashboard in a web browser.
-2. Select your VM (`172.16.0.10` / `172.16.0.11`) and open the **Console** (NoVNC / SPICE).
-3. Log in to the desktop session.
-4. Open a terminal inside the desktop GUI and launch SignSpeak:
-   ```bash
-   cd ~/SignSpeak
-   ./run.sh
-   ```
-
----
-
-### Connect the camera over 5G
-
-In the standard 5G lab setup, the camera streams directly across the 5G radio link:
-
-1. Plug the Sparsh camera's Ethernet cable into the LAN port of the **5G modem** (T99W240).
-2. Power both on and wait about a minute for the modem to register with the 5G network.
-3. **Find the current camera 5G IP**:
-   * The 5G modem assigns a new dynamic WAN IP each time it reconnects.
-   * **Important:** The modem gateway (`192.168.128.1`) is only accessible when connected directly via Ethernet. It cannot be accessed over lab Wi-Fi or from the VM.
-   * Connect your laptop via Ethernet to the 5G modem LAN / camera network (set laptop static IP to `192.168.128.100`, subnet mask `255.255.255.0`).
-   * Open the modem's status page in your laptop browser:
-     ```text
-     http://192.168.128.1
-     ```
-   * Look for the **"WAN IPv4 Address"** (for example, `10.101.0.70`).
-4. **Set the camera IP in `.env`**:
-   * Put the current IP in your `.env` file on the VM:
-     ```ini
-     CAMERA_HOST=10.101.0.70
-     ```
-   * Or specify the full URL in `data/settings.json`:
-     ```json
-     "camera_source": "rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=1.sdp"
-     ```
-5. The camera stream is available over RTSP:
-   ```text
-   rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=1.sdp
-   ```
-   *(SignSpeak automatically probes the configured `CAMERA_HOST` and lists it in the camera picker dropdown).*
-6. To test the 5G link from the VM terminal:
-   ```bash
-   tracepath -n 10.101.0.70
-   ```
-   The path routes through `172.16.0.7` (the 5G core UPF gateway) with `pmtu 1450`.
-
----
-
-### Backup: when the camera is plugged directly into a laptop
-
-If the 5G modem is not used and the camera is plugged directly into your laptop's Ethernet
-port (`192.168.128.100`), the camera's IP is `192.168.128.10`.
-
-Because the VM cannot access your laptop's physical Ethernet port directly, forward the port
-from your laptop:
-
-#### Option 1: Windows Port Proxy (Recommended)
-Run this once in PowerShell on your laptop as **Administrator**:
-```powershell
-netsh interface portproxy add v4tov4 listenport=554 listenaddress=0.0.0.0 connectport=554 connectaddress=192.168.128.10
+### 1. SSH into the edge server
+```bash
+ssh user@172.16.0.10
+cd ~/5Gusecase/SignSpeak
 ```
-Then on the VM, point SignSpeak to your laptop's Wi-Fi IP:
+
+### 2. Start the program in the background
+```bash
+./start.sh
+```
+You will see:
 ```text
-rtsp://admin:admin123@<YOUR_LAPTOP_IP>:554/avstream/channel=1/stream=1.sdp
+==========================================================
+  SignSpeak Web UI is running in background (PID: 12345)
+==========================================================
+  * Local browser:    http://localhost:8080
+  * 5G Edge Server:   http://172.16.0.10:8080
+  * View live logs:   tail -f signspeak.log
+  * Stop server:      ./stop.sh
+==========================================================
 ```
 
-To remove the proxy when done:
-```powershell
-netsh interface portproxy delete v4tov4 listenport=554 listenaddress=0.0.0.0
+### 3. Open the Dashboard
+Connect your laptop or phone to the lab Wi-Fi, open your browser, and navigate to:
+```text
+http://172.16.0.10:8080
 ```
+The dashboard will connect immediately. You can view the live camera stream, see recognized ASL signs,
+and click "Speak Now" or enable auto-speech.
 
-#### Option 2: Direct on Laptop
-If you run SignSpeak directly on the laptop connected to the camera:
-SignSpeak automatically detects `192.168.128.10:554` on the Ethernet link and connects.
+### 4. When you're done:
+```bash
+./stop.sh
+```
 
 ---
 
-## The Sign Models
+## Camera & Network Setup (Finding the Camera IP)
 
-SignSpeak includes two model tiers:
+The Sparsh SC-IM82NP series IP camera is connected to the 5G modem (T99W240) in the lab.
 
-1. **Bundled ASL Reference Model** (`assets/models/asl_legacy_rf.pkl`):
-   Pre-trained on 42-feature hand landmarks for standard ASL alphabet (A-Z) and digits (0-9).
-   Works out of the box with zero setup.
-2. **Personal Trained Model** (`signmodel.joblib` / `data/user_model.joblib`):
-   Trained on 126-feature translation-, scale-, and rotation-normalized landmarks tracking
-   both hands. Supports custom gestures, custom words, and the backspace (DEL) handshape.
+### Why the camera IP changes:
+The 5G modem establishes a cellular PDP context with the 5G core network. Each time the modem or 5G
+cell restarts, the 5G core assigns a dynamic WAN IPv4 address to the modem (for example, `10.101.0.70`).
+The modem automatically DMZ-forwards incoming RTSP port `554` traffic directly to the camera.
 
-### Loading the Model on a new machine / VM
+### How to get the current Camera IP:
+> [!IMPORTANT]
+> The 5G modem web administration page (`192.168.128.1`) is **NOT** accessible from the Wi-Fi or over
+> the 5G network. You **MUST** connect your laptop directly to the modem via an **Ethernet cable**.
 
-The repository includes `signmodel.joblib`. When launching SignSpeak:
-- SignSpeak checks `data/user_model.joblib` first, and falls back to `signmodel.joblib`.
-- In the app, switch between the **Bundled model** and **Personal model** via the **Train** page
-  or by clicking the model badge in the top header.
-- To export or backup a newly trained model, click **Save a copy…** on the Train page.
+1. Connect an Ethernet cable between your laptop and the 5G modem's LAN switch.
+2. Configure your laptop's Ethernet network adapter with a static IP:
+   - **IP Address**: `192.168.128.100`
+   - **Subnet Mask**: `255.255.255.0`
+   - **Default Gateway**: `192.168.128.1`
+3. Open your browser and navigate to:
+   ```text
+   http://192.168.128.1
+   ```
+4. Check the **"WAN IPv4 Address"** on the modem status page (e.g. `10.101.0.70`).
+5. Update your `.env` file on the edge server:
+   ```bash
+   nano .env
+   ```
+   Set:
+   ```ini
+   CAMERA_HOST=10.101.0.70
+   ```
+6. Alternatively, click the **"⚡ 5G Modem (10.101.0.70)"** or **"✏️ Custom..."** button directly in the Web UI!
 
----
-
-## Settings
-
-Settings are stored in `data/settings.json` and can be adjusted in the UI or by editing the file:
-
-| Setting | What it does | Default |
+### Sparsh Topsvision v2.1 RTSP Stream Paths:
+| Stream | Exact RTSP URL | Recommended Use |
 |---|---|---|
-| `camera_source` | Full RTSP stream URL or video source. | `rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=1.sdp` |
-| `camera_index` | Webcam device index (used when `camera_source` is empty). | `0` |
-| `inference_width` | Frame width for MediaPipe inference (`640` or `800` px). | `800` |
-| `confidence` | Detection confidence threshold (0.20 to 0.95). | `0.55` |
-| `hold_ms` | Milliseconds a sign must stay stable before typing. | `500` ms |
-| `smoothing` | Sliding-window frame count for temporal voting. | `8` frames |
-| `min_vote_ratio` | Percentage agreement in window required to commit. | `0.60` (60%) |
-| `cooldown_ms` | Minimum gap before another character can type. | `200` ms |
-| `auto_word` | Speak word aloud when thumbs-up is shown. | `true` |
-| `auto_sentence` | Speak entire sentence aloud when “I love you” sign is shown. | `true` |
-| `active_model` | Active classifier (`user` for personal model, `legacy` for bundled). | `user` |
+| **Substream (720p)** | `rtsp://admin:admin123@<HOST>:554/avstream/channel=1/stream=1.sdp` | **Recommended** (Low latency, 30 FPS, light on CPU) |
+| **Mainstream (4K)** | `rtsp://admin:admin123@<HOST>:554/avstream/channel=1/stream=0.sdp` | High resolution stream |
+
+*(Note: Do not use `/stream1` as older firmware returns `403 Forbidden`).*
 
 ---
 
-## Gesture Shortcuts
+## Backup: Camera Connected Directly via Ethernet
 
-| Sign / Action | What it does |
-|---|---|
-| **Static Handshape (A-Z, 0-9)** | Held for 500 ms → Types the character. |
-| **Thumbs Up 👍** | Space gesture → Completes the current word and speaks it. |
-| **“I love you” 🤟** | Sentence end gesture → Appends period and speaks the full sentence. |
-| **DEL Gesture (Custom)** | Trained backspace handshape → Deletes the last character. |
-| **Custom Word Gesture** | Trained custom sign → Injects full word/phrase directly into transcript. |
+If the 5G modem is turned off and the camera is plugged directly into a laptop's Ethernet port
+(`192.168.128.100`), the camera's fixed IP is `192.168.128.10`.
+
+* If running SignSpeak directly on that laptop:
+  Click the **"🔌 Direct Ethernet (192.168.128.10)"** preset in the Web UI.
+* If running SignSpeak on the VM, forward port 554 from the laptop using Windows portproxy:
+  ```powershell
+  netsh interface portproxy add v4tov4 listenport=554 listenaddress=0.0.0.0 connectport=554 connectaddress=192.168.128.10
+  ```
+  Then in the Web UI enter:
+  `rtsp://admin:admin123@<LAPTOP_WIFI_IP>:554/avstream/channel=1/stream=1.sdp`
+
+---
+
+## ASL & Gesture Cheatsheet
+
+| Gesture | Action | Description |
+|---|---|---|
+| **A – Z** | Letter typing | Hold hand shape steady for 0.5s to type character. |
+| **0 – 9** | Digit typing | Static handshapes for numbers. |
+| **Thumbs Up (`👍`)** | Space (` `) | Finishes current word and triggers word speech. |
+| **I Love You (`🤟`)** | Period (`.`) | Finishes sentence and triggers full sentence speech. |
+| **Open Palm Wave (`✋`)** | Backspace | Deletes the previous character from word buffer. |
+
+---
+
+## Web REST API Reference
+
+The web backend exposes a clean JSON and streaming REST API:
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/` | `GET` | Main Web Dashboard. |
+| `/video_feed` | `GET` | Multipart MJPEG stream with real-time HUD annotations. |
+| `/api/status` | `GET` | JSON status: camera FPS, recognition metrics, word, transcript, model info. |
+| `/api/action` | `POST` | Trigger action: `{"action": "space" \| "period" \| "backspace" \| "clear" \| "type", "param": "A"}`. |
+| `/api/camera` | `POST` | Switch camera: `{"preset": "5g" \| "ethernet" \| "webcam"}` or `{"source": "<RTSP_URL>"}`. |
+| `/api/settings` | `POST` | Live settings update: `{"hold_ms": 500, "confidence": 0.55, "mirror": true}`. |
+| `/api/model` | `POST` | Switch model: `{"kind": "user" \| "legacy"}`. |
+| `/api/dictionary`| `GET` | Full dictionary of ASL handshapes and descriptive hints. |
+| `/api/system` | `GET` | Network configuration, edge server info, and IP lookup helper. |
 
 ---
 
@@ -214,9 +225,8 @@ Settings are stored in `data/settings.json` and can be adjusted in the UI or by 
 
 | Problem | Cause | Solution |
 |---|---|---|
-| **Camera shows OFFLINE** | RTSP stream not reachable. | Check 5G modem IP (`10.101.0.70:554`) or direct link (`192.168.128.10:554`). Press **Retry camera**. |
-| **RTSP returns 403 Forbidden** | Wrong stream URL path used. | Use `/avstream/channel=1/stream=1.sdp` (substream) or `/avstream/channel=1/stream=0.sdp` (main). Do not use `/stream1`. |
-| **Camera feed is lagging / delayed** | RTSP buffer accumulation over UDP. | SignSpeak forces `rtsp_transport;tcp` and buffersize 1. Use the 720p substream (`stream=1.sdp`) instead of 4K. |
-| **Qt XCB error on Linux VM** | GUI display environment missing. | Run inside the VM's desktop console (NoVNC/SPICE). Ensure `libxcb-cursor0` is installed. |
-| **Personal model won't load** | `signmodel.joblib` missing. | Ensure `signmodel.joblib` or `data/user_model.joblib` exists in the folder. |
-| **Speech does not play on Linux** | No TTS voice installed. | Run `sudo apt install espeak-ng libespeak1` on the VM. |
+| **Camera shows "Reconnecting to camera..."** | RTSP stream not reachable. | Check modem IP via Ethernet at `192.168.128.1` or click the **Webcam 0** preset to test locally. |
+| **RTSP returns 403 Forbidden** | Wrong stream path used. | Use `/avstream/channel=1/stream=1.sdp`. Never use `/stream1`. |
+| **Laggy video feed** | UDP packet buffering. | SignSpeak enforces TCP transport (`rtsp_transport;tcp`) and buffer size 1. Use the 720p substream. |
+| **Speech does not play** | Browser audio permissions. | Click anywhere on the webpage or press **"🔊 Speak Now"** to initialize the browser's Web Speech API. |
+| **Port 8080 already in use** | Another service running. | Run `python app.py --port 8090` or stop the other process with `./stop.sh`. |
