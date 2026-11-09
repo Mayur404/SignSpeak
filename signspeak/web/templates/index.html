@@ -1912,7 +1912,7 @@
       };
       // Safety net: if a clip never reports "ended", stop it before moving on
       // so the next one can't play on top of it.
-      const guard = setTimeout(() => { if (token === speechToken) haltAudio(); done(); }, 20000);
+      const guard = setTimeout(() => { if (token === speechToken) haltAudio(); done(); }, 40000);
 
       haltAudio();
       try { if (speechChannel) speechChannel.postMessage('speaking'); } catch (e) {}
@@ -1933,33 +1933,55 @@
         return;
       }
 
-      // Other Indian languages -> Sarvam Bulbul.
-      const url = `/api/tts?text=${encodeURIComponent(next)}&language=${encodeURIComponent(lang)}&t=${Date.now()}`;
-      const audio = new Audio(url);
-      activeAudioPlayer = audio;
-      const vol = (currentSettings.tts_volume ?? 100) / 100;
-      audio.volume = Math.max(0, Math.min(1, vol));
-
+      // Other Indian languages -> Sarvam Bulbul. The server translates the
+      // English signed text into the chosen language before speaking it.
+      // fetch() (instead of <audio src=...>) makes exactly one request and
+      // lets us show Sarvam's real error instead of silently switching voice.
       let fellBack = false;
+      let blobUrl = null;
       const fallback = (err) => {
         if (fellBack || finished || token !== speechToken) return;
         fellBack = true;
-        console.warn('Sarvam audio unavailable, using Microsoft voice:', err);
-        audio.onended = null;
-        audio.onerror = null;
-        try { audio.pause(); audio.removeAttribute('src'); } catch (e) {}
+        console.warn('Sarvam audio unavailable, using device voice:', err);
+        showToast('Sarvam speech failed: ' + ((err && err.message) || err || 'unknown error'));
+        if (activeAudioPlayer) {
+          try { activeAudioPlayer.pause(); activeAudioPlayer.removeAttribute('src'); } catch (e) {}
+        }
         activeAudioPlayer = null;
+        if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; }
         speakLocal(next, done, token, pickVoice(lang) || englishVoice());
       };
-      audio.onended = done;
-      audio.onerror = () => fallback(audio.error);
-      const p = audio.play();
-      if (p !== undefined) {
-        p.catch(err => {
-          if (err && err.name === 'AbortError') return;  // interrupted on purpose
-          fallback(err);
-        });
-      }
+
+      fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: next, language: lang })
+      }).then(async res => {
+        if (!res.ok) {
+          let msg = 'HTTP ' + res.status;
+          try { msg = (await res.json()).message || msg; } catch (e) {}
+          throw new Error(msg);
+        }
+        const spoken = res.headers.get('X-SignSpeak-Spoken');
+        if (spoken) console.debug('[speech] Sarvam says:', decodeURIComponent(spoken));
+        return res.blob();
+      }).then(blob => {
+        if (finished || token !== speechToken) return;  // stopped meanwhile
+        blobUrl = URL.createObjectURL(blob);
+        const audio = new Audio(blobUrl);
+        activeAudioPlayer = audio;
+        const vol = (currentSettings.tts_volume ?? 100) / 100;
+        audio.volume = Math.max(0, Math.min(1, vol));
+        audio.onended = () => { if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; } done(); };
+        audio.onerror = () => fallback(audio.error && (audio.error.message || ('media error ' + audio.error.code)));
+        const p = audio.play();
+        if (p !== undefined) {
+          p.catch(err => {
+            if (err && err.name === 'AbortError') return;  // interrupted on purpose
+            fallback(err);
+          });
+        }
+      }).catch(fallback);
     }
 
     function speakLocal(text, done, token, voice) {

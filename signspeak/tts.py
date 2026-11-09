@@ -19,7 +19,7 @@ from PySide6.QtCore import QByteArray, QEventLoop, QIODevice, QTimer
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 
 
-from .sarvam_env import SARVAM_LANGUAGES, _load_project_env  # noqa: E402,F401
+from .sarvam_env import SARVAM_LANGUAGES, _load_project_env, sarvam_translate, sarvam_tts  # noqa: E402,F401
 
 
 class _SarvamBackend:
@@ -50,20 +50,12 @@ class _SarvamBackend:
                 raise RuntimeError("Set SARVAM_API_KEY to use Sarvam speech.")
             if len(text) > 2500:
                 raise RuntimeError("Sarvam speech supports up to 2,500 characters per request.")
-            payload = json.dumps({
-                "text": text, "language_code": self.language,
-                "speaker": "shubh", "model": "bulbul:v3",
-                "pace": self.pace, "output_audio_codec": "wav",
-            }).encode("utf-8")
-            request = Request(
-                "https://api.sarvam.ai/text-to-speech", data=payload,
-                headers={"api-subscription-key": self.api_key, "Content-Type": "application/json"},
-            )
-            with urlopen(request, timeout=45) as response:
-                result = json.loads(response.read().decode("utf-8"))
+            spoken = sarvam_translate(text, self.language, self.api_key)
             if cancel.is_set():
                 return
-            audio = base64.b64decode(result["audios"][0])
+            audio = sarvam_tts(spoken, self.language, self.pace, self.api_key, timeout=45)
+            if cancel.is_set():
+                return
             self._buffer = QBuffer()
             self._buffer.setData(QByteArray(audio))
             self._buffer.open(QIODevice.OpenModeFlag.ReadOnly)

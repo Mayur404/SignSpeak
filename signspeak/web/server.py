@@ -1,7 +1,6 @@
 """Flask Web Server for SignSpeak Dashboard."""
 from __future__ import annotations
 
-import base64
 import ipaddress
 import json
 import math
@@ -12,7 +11,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.parse import quote
 
 from flask import Flask, Response, jsonify, render_template, request, send_file, send_from_directory
 from werkzeug.exceptions import HTTPException
@@ -21,7 +20,7 @@ from ..labels import SIGN_HINTS, TRAIN_LABELS, display_name, is_trainable_label
 from ..paths import APP_ROOT, USER_MODEL
 from ..recognition import ModelLoadError, load_user_classifier
 from ..speech_input import transcribe_audio
-from ..sarvam_env import SARVAM_LANGUAGES, _load_project_env
+from ..sarvam_env import SARVAM_LANGUAGES, _load_project_env, sarvam_api_key, sarvam_translate, sarvam_tts
 from .streamer import WebStreamEngine
 
 
@@ -417,34 +416,26 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
         if not isinstance(lang, str) or lang not in SARVAM_LANGUAGES.values():
             return jsonify({"status": "error", "message": "Choose a supported Sarvam language."}), 400
 
-        _load_project_env()
-        api_key = os.environ.get("SARVAM_API_KEY", "").strip()
+        api_key = sarvam_api_key()
         if not api_key:
             return jsonify({"status": "error", "message": "SARVAM_API_KEY not configured in .env"}), 400
 
         pace = max(0.5, min(2.0, 1.0 + engine.settings.tts_rate * 0.035))
-        payload = json.dumps({
-            "text": text[:2500],
-            "language_code": lang,
-            "speaker": "shubh",
-            "model": "bulbul:v3",
-            "pace": pace,
-            "output_audio_codec": "wav",
-        }).encode("utf-8")
-        req = Request(
-            "https://api.sarvam.ai/text-to-speech",
-            data=payload,
-            headers={"api-subscription-key": api_key, "Content-Type": "application/json"},
-        )
         try:
-            with urlopen(req, timeout=30) as resp:
-                res_data = json.loads(resp.read().decode("utf-8"))
-            audio_bytes = base64.b64decode(res_data["audios"][0])
-            return Response(audio_bytes, mimetype="audio/wav")
+            # Signed words are English; translate them so a Kannada (etc.)
+            # voice actually speaks Kannada instead of reading English aloud.
+            spoken = sarvam_translate(text, lang, api_key)
+            audio_bytes = sarvam_tts(spoken, lang, pace, api_key)
+            response = Response(audio_bytes, mimetype="audio/wav")
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["X-SignSpeak-Spoken"] = quote(spoken)
+            return response
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")[:500]
+            app.logger.warning("Sarvam error %s: %s", exc.code, detail)
             return jsonify({"status": "error", "message": f"Sarvam error ({exc.code}): {detail}"}), 502
         except (URLError, TimeoutError) as exc:
+            app.logger.warning("Sarvam unreachable: %s", exc)
             return jsonify({"status": "error", "message": f"Sarvam service is unavailable: {exc}"}), 502
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc)}), 500
