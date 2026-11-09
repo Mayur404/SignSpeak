@@ -99,13 +99,15 @@ In the standard 5G lab setup, the camera streams directly across the 5G radio li
 2. Power both on and wait about a minute for the modem to register with the 5G network.
 3. **Find the current camera 5G IP**:
    * The 5G modem assigns a new dynamic WAN IP each time it reconnects.
-   * Open the modem's local status page in your browser at:
+   * **Important:** The modem gateway (`192.168.128.1`) is only accessible when connected directly via Ethernet. It cannot be accessed over lab Wi-Fi or from the VM.
+   * Connect your laptop via Ethernet to the 5G modem LAN / camera network (set laptop static IP to `192.168.128.100`, subnet mask `255.255.255.0`).
+   * Open the modem's status page in your laptop browser:
      ```text
      http://192.168.128.1
      ```
    * Look for the **"WAN IPv4 Address"** (for example, `10.101.0.70`).
 4. **Set the camera IP in `.env`**:
-   * Put the current IP in your `.env` file on the VM or laptop:
+   * Put the current IP in your `.env` file on the VM:
      ```ini
      CAMERA_HOST=10.101.0.70
      ```
