@@ -42,6 +42,7 @@ from ..trainer import (
     TrainingError,
     train_model,
 )
+from ..textdraw import put_text, text_size
 from ..vision import (
     HAND_CONNECTIONS,
     HandTracker,
@@ -101,6 +102,7 @@ class WebStreamEngine:
         self._paused = False
         self._lock = threading.Lock()
         self._frame_cond = threading.Condition(self._lock)
+        self._frame_seq = 0
 
         # Output buffers
         self._latest_jpeg: bytes | None = None
@@ -266,6 +268,7 @@ class WebStreamEngine:
         """Main camera acquisition, hand detection, recognition & HUD loop."""
         consecutive_failures = 0
         last_frame_time = time.monotonic()
+        last_good_frame = time.monotonic()
         last_tracker_retry = 0.0
 
         while self._running:
@@ -312,6 +315,7 @@ class WebStreamEngine:
                 self._cap = cap
                 self._active_camera_source = requested_source
                 self._camera_connected = True
+                last_good_frame = time.monotonic()
                 self._last_error = None
                 consecutive_failures = 0
 
@@ -326,7 +330,13 @@ class WebStreamEngine:
 
             if not ok or frame is None:
                 consecutive_failures += 1
-                if consecutive_failures > 30:
+                # The RTSP reader returns "no new frame" instantly while the
+                # stream catches up, so judge by time, not by count: only
+                # reconnect after 6 s (webcam: 3 s) without any frame.
+                stall_limit = 6.0 if isinstance(cap, _LatestFrameReader) else 3.0
+                if time.monotonic() - last_good_frame > stall_limit:
+                    consecutive_failures = 0
+                    last_good_frame = time.monotonic()
                     self._camera_connected = False
                     self._close_camera()
                     time.sleep(0.5)
@@ -336,6 +346,7 @@ class WebStreamEngine:
 
             consecutive_failures = 0
             now = time.monotonic()
+            last_good_frame = now
             h, w = frame.shape[:2]
             self._camera_dims = (w, h)
 
@@ -449,6 +460,7 @@ class WebStreamEngine:
                 with self._lock:
                     self._latest_jpeg = jpeg_bytes.tobytes()
                     self._latest_state = state
+                    self._frame_seq += 1
                     self._frame_cond.notify_all()
 
             time.sleep(0.005)
@@ -530,14 +542,14 @@ class WebStreamEngine:
             badge_str = f"{label_text}  {conf_val}%"
             font = cv2.FONT_HERSHEY_DUPLEX
             scale = 0.75
-            (tw, th), _ = cv2.getTextSize(badge_str, font, scale, 2)
+            (tw, th), _ = text_size(badge_str, font, scale, 2)
             chip_w, chip_h = tw + 32, th + 24
             cx = min(max(x1, 14), w - chip_w - 14)
             cy = max(14, y1 - chip_h - 14)
 
             _draw_rounded_rect(frame, (cx, cy), (cx + chip_w, cy + chip_h), DARK_BG, 12, -1, 0.75)
             _draw_rounded_rect(frame, (cx, cy), (cx + chip_w, cy + chip_h), hand_color, 12, 2, 0.9)
-            cv2.putText(
+            put_text(
                 frame, badge_str, (cx + 16, cy + chip_h - 12), font, scale, WHITE, 2, cv2.LINE_AA
             )
 
@@ -581,9 +593,9 @@ class WebStreamEngine:
         elif rec_active and rec_lbl:
             badge_text = f"REC: {display_name(rec_lbl)} ({rec_samples_len} samples)"
             font = cv2.FONT_HERSHEY_DUPLEX
-            (tw, th), _ = cv2.getTextSize(badge_text, font, 0.7, 2)
+            (tw, th), _ = text_size(badge_text, font, 0.7, 2)
             _draw_rounded_rect(frame, (w // 2 - tw // 2 - 16, 16), (w // 2 + tw // 2 + 16, 16 + th + 18), (0, 0, 180), 8, -1, 0.85)
-            cv2.putText(frame, badge_text, (w // 2 - tw // 2, 16 + th + 7), font, 0.7, WHITE, 2, cv2.LINE_AA)
+            put_text(frame, badge_text, (w // 2 - tw // 2, 16 + th + 7), font, 0.7, WHITE, 2, cv2.LINE_AA)
 
         bar_h = 36
         _draw_rounded_rect(frame, (12, h - bar_h - 12), (w - 12, h - 12), DARK_BG, 10, -1, 0.75)
@@ -641,14 +653,25 @@ class WebStreamEngine:
         if ret:
             with self._lock:
                 self._latest_jpeg = jpeg_bytes.tobytes()
+                self._frame_seq += 1
                 self._frame_cond.notify_all()
 
     def generate_mjpeg(self) -> Generator[bytes, None, None]:
         """Yield multipart MJPEG stream to HTTP browser client."""
+        # Send each frame once; re-send the last one only as a 1 s keep-alive
+        # so a stalled camera doesn't flood the (5G) link with duplicates.
+        sent_seq = -1
+        last_sent = 0.0
         while self._running:
             with self._frame_cond:
-                self._frame_cond.wait(timeout=1.0)
+                if self._frame_seq == sent_seq:
+                    self._frame_cond.wait(timeout=1.0)
                 frame_data = self._latest_jpeg
+                seq = self._frame_seq
+            now = time.monotonic()
+            if seq == sent_seq and now - last_sent < 1.0:
+                continue
+            sent_seq, last_sent = seq, now
             if frame_data:
                 yield (
                     b"--frame\r\n"

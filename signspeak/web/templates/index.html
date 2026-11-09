@@ -1066,7 +1066,7 @@
         <div class="video-card">
           <div class="card">
             <div class="video-viewport" id="videoBox">
-              <img id="cameraStream" src="/video_feed" alt="Live Camera" onerror="retryStream()">
+              <img id="cameraStream" src="/video_feed" alt="Live Camera" onerror="if (this.getAttribute('src')) setTimeout(() => retryStream(true), 1500)">
             </div>
             <div class="video-controls">
               <span class="pill" tone="green" id="liveStatusPill">LIVE</span>
@@ -1219,7 +1219,7 @@
             <span class="pill" id="trainPreviewPill" tone="green">LIVE</span>
           </div>
           <div class="video-viewport" style="border-radius: 9px; min-height: 240px;">
-            <img id="trainCameraStream" src="/video_feed" alt="Train Preview Stream" onerror="this.style.display='none'; document.getElementById('trainStreamFallback').style.display='flex';" onload="this.style.display='block'; document.getElementById('trainStreamFallback').style.display='none';">
+            <img id="trainCameraStream" alt="Train Preview Stream" onerror="if (!this.getAttribute('src')) return; this.style.display='none'; document.getElementById('trainStreamFallback').style.display='flex';" onload="this.style.display='block'; document.getElementById('trainStreamFallback').style.display='none';">
             <div id="trainStreamFallback" style="display: none; flex-direction: column; align-items: center; justify-content: center; color: var(--faint); gap: 6px;">
               <span style="font-size: 14px; font-weight: 600;">Camera offline</span>
               <span style="font-size: 11px;">Check camera connection in Settings</span>
@@ -1667,6 +1667,7 @@
         document.getElementById('navSettings').classList.add('active');
         loadSettingsIntoForm();
       }
+      if (typeof retryStream === 'function') retryStream(false);
     }
 
     // Toast
@@ -1674,7 +1675,8 @@
       const t = document.getElementById('toast');
       document.getElementById('toastMsg').textContent = msg;
       t.style.display = 'flex';
-      setTimeout(() => { t.style.display = 'none'; }, 2200);
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => { t.style.display = 'none'; }, Math.max(2200, msg.length * 60));
     }
 
     // Mini Toggles
@@ -1807,14 +1809,23 @@
         : 'Speech: ' + lang + ' (Sarvam)');
     }
 
-    let audioUnlocked = false;
+    // Sarvam clips play through one Web Audio context. Browsers only allow
+    // audio after a click/key press; <audio>.play() from a background status
+    // poll was rejected with "play method is not allowed". Once the context
+    // is resumed by any gesture it keeps playing without further clicks.
+    let audioCtx = null;
+    let activeSource = null;
+    let audioHintShown = false;
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) { try { audioCtx = new Ctx(); } catch (e) { audioCtx = null; } }
+      }
+      return audioCtx;
+    }
     function unlockAudio() {
-      if (audioUnlocked) return;
-      audioUnlocked = true;
-      try {
-        const a = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
-        a.play().catch(() => {});
-      } catch (e) {}
+      const ctx = getAudioCtx();
+      if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
     }
     window.addEventListener('click', unlockAudio, { passive: true });
     window.addEventListener('keydown', unlockAudio, { passive: true });
@@ -1863,6 +1874,10 @@
       if (activeAudioPlayer) {
         try { activeAudioPlayer.pause(); activeAudioPlayer.removeAttribute('src'); } catch (e) {}
         activeAudioPlayer = null;
+      }
+      if (activeSource) {
+        try { activeSource.onended = null; activeSource.stop(); } catch (e) {}
+        activeSource = null;
       }
       try { if (synth) synth.cancel(); } catch (e) {}
     }
@@ -1938,19 +1953,17 @@
       // fetch() (instead of <audio src=...>) makes exactly one request and
       // lets us show Sarvam's real error instead of silently switching voice.
       let fellBack = false;
-      let blobUrl = null;
       const fallback = (err) => {
         if (fellBack || finished || token !== speechToken) return;
         fellBack = true;
         console.warn('Sarvam audio unavailable, using device voice:', err);
         showToast('Sarvam speech failed: ' + ((err && err.message) || err || 'unknown error'));
-        if (activeAudioPlayer) {
-          try { activeAudioPlayer.pause(); activeAudioPlayer.removeAttribute('src'); } catch (e) {}
-        }
-        activeAudioPlayer = null;
-        if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; }
+        if (activeSource) { try { activeSource.onended = null; activeSource.stop(); } catch (e) {} activeSource = null; }
         speakLocal(next, done, token, pickVoice(lang) || englishVoice());
       };
+
+      const ctx = getAudioCtx();
+      if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
 
       fetch('/api/tts', {
         method: 'POST',
@@ -1964,23 +1977,31 @@
         }
         const spoken = res.headers.get('X-SignSpeak-Spoken');
         if (spoken) console.debug('[speech] Sarvam says:', decodeURIComponent(spoken));
-        return res.blob();
-      }).then(blob => {
-        if (finished || token !== speechToken) return;  // stopped meanwhile
-        blobUrl = URL.createObjectURL(blob);
-        const audio = new Audio(blobUrl);
-        activeAudioPlayer = audio;
-        const vol = (currentSettings.tts_volume ?? 100) / 100;
-        audio.volume = Math.max(0, Math.min(1, vol));
-        audio.onended = () => { if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; } done(); };
-        audio.onerror = () => fallback(audio.error && (audio.error.message || ('media error ' + audio.error.code)));
-        const p = audio.play();
-        if (p !== undefined) {
-          p.catch(err => {
-            if (err && err.name === 'AbortError') return;  // interrupted on purpose
-            fallback(err);
-          });
+        return res.arrayBuffer();
+      }).then(buf => {
+        if (finished || token !== speechToken) return null;  // stopped meanwhile
+        if (!ctx) throw new Error('Web Audio is not supported in this browser');
+        return ctx.decodeAudioData(buf);
+      }).then(decoded => {
+        if (!decoded || finished || token !== speechToken) return;
+        if (ctx.state !== 'running') {
+          // No click/key press on this page yet: the browser blocks sound.
+          // Don't show an error; ask once for a click and skip this clip.
+          if (!audioHintShown) {
+            audioHintShown = true;
+            showToast('Click anywhere on the page once to enable speech');
+          }
+          done();
+          return;
         }
+        const src = ctx.createBufferSource();
+        src.buffer = decoded;
+        const gain = ctx.createGain();
+        gain.gain.value = Math.max(0, Math.min(1, (currentSettings.tts_volume ?? 100) / 100));
+        src.connect(gain).connect(ctx.destination);
+        activeSource = src;
+        src.onended = () => { if (activeSource === src) activeSource = null; done(); };
+        src.start();
       }).catch(fallback);
     }
 
@@ -2170,13 +2191,25 @@
       }
     }
 
-    function retryStream() {
+    // Each <img> showing /video_feed holds an HTTP connection open, and the
+    // browser allows only ~6 per server. Two streams per tab (plus extra
+    // tabs) starved the status poll and the stream itself -> random freezes.
+    // So only the visible page's stream is connected, and none while hidden.
+    function retryStream(force) {
+      force = force !== false && !(force instanceof Event);
       const t = Date.now();
       const img1 = document.getElementById('cameraStream');
       const img2 = document.getElementById('trainCameraStream');
-      if (img1) img1.src = '/video_feed?t=' + t;
-      if (img2) img2.src = '/video_feed?t=' + t;
+      const trainVisible = document.getElementById('pageTrain')?.classList.contains('active');
+      const wanted = document.hidden ? null : (trainVisible ? img2 : img1);
+      [img1, img2].forEach(img => {
+        if (!img) return;
+        if (img === wanted) { if (force || !img.getAttribute('src')) img.src = '/video_feed?t=' + t; }
+        else if (img.getAttribute('src')) img.removeAttribute('src');
+      });
     }
+    document.addEventListener('visibilitychange', () => retryStream(false));
+    window.addEventListener('pageshow', () => retryStream(false));
 
     // Polling /api/status (every 200ms)
     const CIRCUMFERENCE = 552.92; // 2 * PI * 88
@@ -2213,8 +2246,10 @@
 
     let lastStatusErrorAt = 0;
     async function pollStatus() {
+      const ctrl = new AbortController();
+      const killer = setTimeout(() => ctrl.abort(), 4000);
       try {
-        const res = await fetch('/api/status');
+        const res = await fetch('/api/status', { signal: ctrl.signal, cache: 'no-store' });
         if (!res.ok) throw new Error(`Status request failed (${res.status})`);
         updateUI(await res.json());
       } catch (e) {
@@ -2222,8 +2257,10 @@
           console.warn('SignSpeak status unavailable:', e);
           lastStatusErrorAt = Date.now();
         }
+      } finally {
+        clearTimeout(killer);
       }
-      setTimeout(pollStatus, 200);
+      setTimeout(pollStatus, document.hidden ? 1000 : 200);
     }
 
     function updateUI(d) {
@@ -3039,6 +3076,13 @@
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
           mediaRecorder.stop();
         }
+        return;
+      }
+
+      // Browsers only allow the microphone on https:// or localhost. Opened
+      // as http://<vm-ip>:18473 the mic API simply doesn't exist, so say why.
+      if (!window.isSecureContext) {
+        showToast('Mic blocked on http://' + location.host + ' - open chrome://flags/#unsafely-treat-insecure-origin-as-secure, add ' + location.origin + ', relaunch Chrome');
         return;
       }
 

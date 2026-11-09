@@ -32,6 +32,7 @@ except Exception:  # pragma: no cover - headless VM without Qt libraries
 
 from .config import Settings
 from .features import as_points, dual_hand_features
+from .textdraw import put_text, text_size
 from .labels import display_name
 from .paths import LANDMARKER_MODEL
 from .recognition import RecognitionEngine, RecognitionState
@@ -356,13 +357,13 @@ def _draw_overlay(frame, points, state: RecognitionState, mirror: bool, paused: 
     text = f"{label}  {confidence}%" if state.hand_present else label
     font = cv2.FONT_HERSHEY_DUPLEX
     scale = 0.75
-    (tw, th), _ = cv2.getTextSize(text, font, scale, 2)
+    (tw, th), _ = text_size(text, font, scale, 2)
     chip_w, chip_h = tw + 28, th + 22
     cx = min(max(x1, 12), w - chip_w - 12)
     cy = max(12, y1 - chip_h - 12)
     _rounded_rect(frame, (cx, cy), (cx + chip_w, cy + chip_h), DARK, 12, -1, 0.72)
     _rounded_rect(frame, (cx, cy), (cx + chip_w, cy + chip_h), color, 12, 1, 0.9)
-    cv2.putText(frame, text, (cx + 14, cy + chip_h - 12), font, scale, WHITE, 2, cv2.LINE_AA)
+    put_text(frame, text, (cx + 14, cy + chip_h - 12), font, scale, WHITE, 2, cv2.LINE_AA)
 
 
 def _draw_paused(frame) -> None:

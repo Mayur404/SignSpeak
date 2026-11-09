@@ -34,3 +34,10 @@ the MIT License:
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
 
+
+## Noto Sans fonts (assets/fonts/)
+
+Noto Sans and Noto Sans Bengali, Devanagari, Gujarati, Gurmukhi, Kannada,
+Malayalam, Oriya, Tamil and Telugu (Bold), Copyright The Noto Project Authors
+(https://github.com/notofonts). Licensed under the SIL Open Font License 1.1
+(https://openfontlicense.org). Used to draw Indian-language words on the video HUD.
