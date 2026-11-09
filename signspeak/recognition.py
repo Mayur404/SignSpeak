@@ -175,7 +175,11 @@ def load_legacy_classifier(path: Path = LEGACY_MODEL) -> SignClassifier:
 
 def load_user_classifier(path: Path = USER_MODEL) -> SignClassifier:
     if not path.exists():
-        raise ModelLoadError("You have not trained a personal model yet.")
+        fallback = APP_ROOT / "signmodel.joblib"
+        if fallback.exists():
+            path = fallback
+        else:
+            raise ModelLoadError("You have not trained a personal model yet.")
     try:
         import joblib
 

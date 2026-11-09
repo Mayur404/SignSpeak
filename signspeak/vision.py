@@ -93,7 +93,7 @@ WHITE = (245, 248, 252)
 DARK = (8, 12, 20)
 GREEN = (153, 211, 52)       # #34D399 in BGR
 
-SPARSH_HOST = "192.168.128.10"
+SPARSH_HOST = os.environ.get("CAMERA_HOST") or "192.168.128.10"
 SPARSH_PORT = 554
 SPARSH_STREAM_PATHS = {
     "sub": (
@@ -108,9 +108,10 @@ SPARSH_STREAM_PATHS = {
 SPARSH_CREDENTIALS = "admin:admin123"
 
 
-def sparsh_stream_urls() -> list[tuple[str, str]]:
+def sparsh_stream_urls(host: str | None = None) -> list[tuple[str, str]]:
     """Return the preferred sub/main RTSP URLs shown in the camera picker."""
-    authority = f"{SPARSH_CREDENTIALS}@{SPARSH_HOST}:{SPARSH_PORT}"
+    target_host = host or SPARSH_HOST
+    authority = f"{SPARSH_CREDENTIALS}@{target_host}:{SPARSH_PORT}"
     return [
         (
             f"rtsp://{authority}{SPARSH_STREAM_PATHS['sub'][0]}",
@@ -130,7 +131,14 @@ def _camera_candidates(source: str) -> list[str]:
         port = parsed.port or SPARSH_PORT
     except ValueError:
         return [source]
-    if parsed.scheme.lower() != "rtsp" or parsed.hostname != SPARSH_HOST or port != SPARSH_PORT:
+    if parsed.scheme.lower() != "rtsp" or port != SPARSH_PORT:
+        return [source]
+
+    is_sparsh = parsed.hostname in (SPARSH_HOST, "10.101.0.70", "192.168.128.10") or any(
+        p in parsed.path for paths in SPARSH_STREAM_PATHS.values() for p in paths
+    ) or "stream1" in parsed.path or "stream0" in parsed.path
+
+    if not is_sparsh:
         return [source]
 
     selected_mode = next(
@@ -138,7 +146,12 @@ def _camera_candidates(source: str) -> list[str]:
         None,
     )
     if selected_mode is None:
-        return [source]
+        if "stream1" in parsed.path:
+            selected_mode = "sub"
+        elif "stream0" in parsed.path:
+            selected_mode = "main"
+        else:
+            return [source]
 
     modes = (selected_mode, "main" if selected_mode == "sub" else "sub")
     candidates = [source]
@@ -717,12 +730,19 @@ class CameraProbe(QThread):
 
         found: list[tuple[int | str, str]] = []
 
-        # Offer Sparsh streams only when its configured RTSP port is reachable.
-        try:
-            with socket.create_connection((SPARSH_HOST, SPARSH_PORT), timeout=0.4):
-                found.extend(sparsh_stream_urls())
-        except Exception:
-            pass
+        # Offer Sparsh streams when reachable across 5G modem or direct Ethernet
+        target_hosts = [SPARSH_HOST]
+        for alt_host in ("10.101.0.70", "192.168.128.10"):
+            if alt_host not in target_hosts:
+                target_hosts.append(alt_host)
+
+        for host in target_hosts:
+            try:
+                with socket.create_connection((host, SPARSH_PORT), timeout=0.3):
+                    found.extend(sparsh_stream_urls(host))
+                    break
+            except Exception:
+                pass
 
         # If current source is a custom RTSP stream, retain it in list
         if isinstance(self.skip_source, str) and self.skip_source.startswith("rtsp://"):

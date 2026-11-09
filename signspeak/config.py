@@ -17,7 +17,7 @@ def _clamp(value: float, low: float, high: float) -> float:
 class Settings:
     # Camera
     camera_index: int = 0
-    camera_source: str = ""
+    camera_source: str = "rtsp://admin:admin123@10.101.0.70:554/avstream/channel=1/stream=1.sdp"
     mirror: bool = True
     inference_width: int = 800
     capture_delay: float = 3.0
