@@ -60,7 +60,54 @@ from ..vision import (
     warm_tracker,
 )
 
+class _RtspReader(_LatestFrameReader):
+    """Web-app RTSP reader that never releases a capture mid-read.
+
+    The base reader's close() releases the FFmpeg capture from the worker
+    thread while this thread may be blocked in read() (up to
+    CAMERA_READ_TIMEOUT_MS over a laggy 5G link). Releasing a capture during a
+    read can hang or crash OpenCV, so here only the reader thread releases its
+    own capture, once its current read returns.
+    """
+
+    def _run(self):
+        try:
+            while not self._stopped.is_set():
+                try:
+                    ok, frame = self.capture.read()
+                except Exception:
+                    if not self._stopped.is_set():
+                        self._failed = True
+                    return
+                if self._stopped.is_set():
+                    return
+                if not ok or frame is None:
+                    time.sleep(0.005)
+                    continue
+                with self._lock:
+                    self._frame = frame
+                    self._sequence += 1
+        finally:
+            try:
+                self.capture.release()
+            except Exception:
+                pass
+
+    @property
+    def failed(self) -> bool:
+        return self._failed
+
+    def close(self):
+        # Signal only; the reader thread releases the capture when its
+        # current read returns. Don't block the worker on a slow read.
+        self._stopped.set()
+        self._thread.join(timeout=0.5)
+
+
 BROWSER_SOURCE = "browser"
+# OpenCV's Windows camera backends corrupt the heap when two threads open a
+# local webcam at the same moment; serialize those opens.
+_LOCAL_CAMERA_OPEN_LOCK = threading.Lock()
 
 
 class BrowserFrameSource:
@@ -301,26 +348,33 @@ class WebStreamEngine:
 
         # 1. Check if integer index (local webcam)
         if source.isdigit():
-            index = int(source)
-            cap = None
-            if sys.platform == "win32":
-                cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-            if cap is None or not cap.isOpened():
-                if cap is not None:
-                    cap.release()
-                cap = cv2.VideoCapture(index)
-            if cap and cap.isOpened():
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-                cap.set(cv2.CAP_PROP_FPS, 30)
-                try:
-                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                except Exception:
-                    pass
-                return cap
-            return None
+            with _LOCAL_CAMERA_OPEN_LOCK:
+                return self._open_local_camera(int(source))
 
-        # 2. RTSP or Video File
+        return self._open_stream(source)
+
+    def _open_local_camera(self, index: int):
+        """Open a local webcam. Callers hold _LOCAL_CAMERA_OPEN_LOCK."""
+        cap = None
+        if sys.platform == "win32":
+            cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+        if cap is None or not cap.isOpened():
+            if cap is not None:
+                cap.release()
+            cap = cv2.VideoCapture(index)
+        if cap and cap.isOpened():
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            cap.set(cv2.CAP_PROP_FPS, 30)
+            try:
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            except Exception:
+                pass
+            return cap
+        return None
+
+    def _open_stream(self, source: str):
+        """Open an RTSP URL (or video file), trying the Sparsh path variants."""
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
         candidates = _camera_candidates(source)
         started = time.monotonic()
@@ -338,7 +392,7 @@ class WebStreamEngine:
                 return None
             if cap is not None:
                 print(f"[camera] connected in {time.monotonic() - attempt:.1f}s: {_safe_camera_source(url)}", flush=True)
-                return _LatestFrameReader(cap)
+                return _RtspReader(cap)
             print(f"[camera] failed after {time.monotonic() - attempt:.1f}s: {_safe_camera_source(url)}", flush=True)
         print(f"[camera] all {len(candidates)} stream paths failed ({time.monotonic() - started:.1f}s total); retrying", flush=True)
         return None
@@ -509,6 +563,15 @@ class WebStreamEngine:
                                 hint="Keep the SignSpeak tab open and allow camera access (needs https://)",
                             )
                     time.sleep(0.02)
+                    continue
+                if isinstance(cap, _RtspReader) and cap.failed:
+                    # The FFmpeg read raised: the stream is gone, so reconnect
+                    # now instead of waiting out the stall timeout.
+                    print("[camera] RTSP read error - reconnecting", flush=True)
+                    last_good_frame = time.monotonic()
+                    self._camera_connected = False
+                    self._close_camera()
+                    time.sleep(0.5)
                     continue
                 consecutive_failures += 1
                 # The RTSP reader returns "no new frame" instantly while the

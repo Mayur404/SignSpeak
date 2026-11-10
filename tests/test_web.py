@@ -334,3 +334,48 @@ class InterruptibleRtspOpenTestCase(unittest.TestCase):
         self.assertTrue(switched)
         self.assertIsNone(cap)
         self.assertLess(time.monotonic() - started, 2.0)
+
+
+class RtspReaderTestCase(unittest.TestCase):
+    def test_close_never_releases_capture_during_a_blocked_read(self):
+        import threading
+        from signspeak.web.streamer import _RtspReader
+
+        in_read, finish_read = threading.Event(), threading.Event()
+        events = []
+
+        class BlockingCapture:
+            def read(self):
+                in_read.set()
+                finish_read.wait(5)
+                events.append("read-returned")
+                return False, None
+
+            def release(self):
+                events.append(("release", threading.current_thread().name))
+
+        reader = _RtspReader(BlockingCapture())
+        self.assertTrue(in_read.wait(2))
+        started = time.monotonic()
+        reader.close()  # read still blocked
+        self.assertLess(time.monotonic() - started, 1.5)
+        self.assertEqual(events, [])  # not released mid-read
+        finish_read.set()
+        reader._thread.join(2)
+        self.assertEqual(events[0], "read-returned")
+        self.assertEqual(events[1], ("release", "camera-reader"))
+
+    def test_read_error_is_reported_as_failed(self):
+        from signspeak.web.streamer import _RtspReader
+
+        class BrokenCapture:
+            def read(self):
+                raise RuntimeError("stream gone")
+
+            def release(self):
+                pass
+
+        reader = _RtspReader(BrokenCapture())
+        reader._thread.join(2)
+        self.assertTrue(reader.failed)
+        self.assertEqual(reader.read(), (False, None))
