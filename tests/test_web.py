@@ -299,3 +299,38 @@ class BrowserCameraTestCase(unittest.TestCase):
         cam = self.client.get("/api/status").get_json()["camera"]
         self.assertEqual(cam["raw_source"], "browser")
         self.assertEqual(cam["mode"], "laptop")
+
+
+class InterruptibleRtspOpenTestCase(unittest.TestCase):
+    def test_switching_camera_abandons_slow_rtsp_connect(self):
+        import threading
+
+        engine = WebStreamEngine(Settings(camera_source="0"))
+        url = "rtsp://admin:admin123@10.101.0.85:554/avstream/channel=1/stream=1.sdp"
+        engine._camera_source = url
+        engine._running = True
+        release_open = threading.Event()
+
+        class SlowCapture:
+            def __init__(self, *args, **kwargs):
+                release_open.wait(5)
+
+            def isOpened(self):
+                return True
+
+            def release(self):
+                pass
+
+        def switch_soon():
+            time.sleep(0.3)
+            engine.switch_camera("browser")
+
+        threading.Thread(target=switch_soon, daemon=True).start()
+        started = time.monotonic()
+        with patch("signspeak.web.streamer.cv2.VideoCapture", SlowCapture):
+            cap, switched = engine._open_rtsp_interruptible(url, url)
+        release_open.set()
+        engine._running = False
+        self.assertTrue(switched)
+        self.assertIsNone(cap)
+        self.assertLess(time.monotonic() - started, 2.0)

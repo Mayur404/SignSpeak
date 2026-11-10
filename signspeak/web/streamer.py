@@ -332,6 +332,38 @@ class WebStreamEngine:
                 return None
             attempt = time.monotonic()
             print(f"[camera] connecting to {_safe_camera_source(url)} (timeout {RTSP_OPEN_TIMEOUT_MS / 1000:.0f}s)...", flush=True)
+            cap, switched = self._open_rtsp_interruptible(url, source)
+            if switched:
+                print("[camera] source changed - abandoning RTSP connect", flush=True)
+                return None
+            if cap is not None:
+                print(f"[camera] connected in {time.monotonic() - attempt:.1f}s: {_safe_camera_source(url)}", flush=True)
+                return _LatestFrameReader(cap)
+            print(f"[camera] failed after {time.monotonic() - attempt:.1f}s: {_safe_camera_source(url)}", flush=True)
+        print(f"[camera] all {len(candidates)} stream paths failed ({time.monotonic() - started:.1f}s total); retrying", flush=True)
+        return None
+
+    def _open_rtsp_interruptible(self, url: str, source: str):
+        """Open one RTSP URL on a helper thread; return (capture|None, switched).
+
+        OpenCV's connect blocks for up to CAMERA_OPEN_TIMEOUT_MS and can't be
+        cancelled. Running it on a helper thread lets the worker drop it as
+        soon as the user picks another camera (e.g. Laptop Webcam) instead of
+        waiting out the timeout. An abandoned capture is released by the
+        helper thread when OpenCV finally returns.
+        """
+        box = {"cap": None, "abandoned": False}
+        box_lock = threading.Lock()
+        done = threading.Event()
+
+        def release(cap) -> None:
+            try:
+                cap.release()
+            except Exception:
+                pass
+
+        def opener() -> None:
+            cap = None
             try:
                 params = [
                     cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT_MS,
@@ -341,15 +373,37 @@ class WebStreamEngine:
                     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG, params)
                 except (TypeError, cv2.error):
                     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
-                if cap.isOpened():
-                    print(f"[camera] connected in {time.monotonic() - attempt:.1f}s: {_safe_camera_source(url)}", flush=True)
-                    return _LatestFrameReader(cap)
-                cap.release()
+                if not cap.isOpened():
+                    release(cap)
+                    cap = None
             except Exception:
-                pass
-            print(f"[camera] failed after {time.monotonic() - attempt:.1f}s: {_safe_camera_source(url)}", flush=True)
-        print(f"[camera] all {len(candidates)} stream paths failed ({time.monotonic() - started:.1f}s total); retrying", flush=True)
-        return None
+                cap = None
+            with box_lock:
+                abandoned = box["abandoned"]
+                if not abandoned:
+                    box["cap"] = cap
+            if abandoned and cap is not None:
+                release(cap)
+            done.set()
+
+        threading.Thread(target=opener, name="camera-rtsp-open", daemon=True).start()
+        last_placeholder = 0.0
+        while not done.wait(0.1):
+            with self._lock:
+                switched = not self._running or str(self._camera_source).strip() != source
+            if switched:
+                with box_lock:
+                    box["abandoned"] = True
+                    cap, box["cap"] = box["cap"], None
+                if cap is not None:
+                    release(cap)
+                return None, True
+            now = time.monotonic()
+            if now - last_placeholder > 0.5:  # keep the "Connecting" card animated
+                last_placeholder = now
+                self._render_placeholder_frame("Connecting to camera...", source)
+        with box_lock:
+            return box["cap"], False
 
     def _worker_loop(self) -> None:
         """Main camera acquisition, hand detection, recognition & HUD loop."""
@@ -390,6 +444,10 @@ class WebStreamEngine:
                     self._render_placeholder_frame("Connecting to camera...", requested_source)
                 cap = self._open_camera(requested_source)
                 if cap is None:
+                    with self._lock:
+                        switched_away = self._camera_source != requested_source
+                    if switched_away:
+                        continue  # user picked another camera mid-connect; open it now
                     if requested_source != last_failed_source:
                         open_failures = 0
                         last_failed_source = requested_source
