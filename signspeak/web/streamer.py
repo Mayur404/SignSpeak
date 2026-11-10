@@ -48,6 +48,8 @@ from ..vision import (
     HandTracker,
     Observation,
     _LatestFrameReader,
+    RTSP_OPEN_TIMEOUT_MS,
+    RTSP_READ_TIMEOUT_MS,
     _rounded_rect,
     _camera_candidates,
     _safe_camera_source,
@@ -250,8 +252,8 @@ class WebStreamEngine:
         for url in candidates:
             try:
                 params = [
-                    cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 2500,
-                    cv2.CAP_PROP_READ_TIMEOUT_MSEC, 1500,
+                    cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT_MS,
+                    cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_READ_TIMEOUT_MS,
                 ]
                 try:
                     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG, params)
@@ -298,6 +300,8 @@ class WebStreamEngine:
             # Open a snapshot of the requested source. Discard it if another
             # switch arrived while OpenCV was connecting.
             if self._cap is None:
+                if open_failures == 0:
+                    self._render_placeholder_frame("Connecting to camera...", requested_source)
                 cap = self._open_camera(requested_source)
                 if cap is None:
                     if requested_source != last_failed_source:
@@ -309,7 +313,7 @@ class WebStreamEngine:
                     # Generate animated standby placeholder frame so browser stream stays active.
                     # After a few failed attempts say so plainly instead of "Connecting..."
                     # forever: on 5G the modem's WAN IP changes on every reconnect.
-                    if open_failures >= 3:
+                    if open_failures >= 1:
                         self._render_placeholder_frame(
                             "Camera not reachable - retrying...",
                             requested_source,
@@ -349,8 +353,9 @@ class WebStreamEngine:
                 consecutive_failures += 1
                 # The RTSP reader returns "no new frame" instantly while the
                 # stream catches up, so judge by time, not by count: only
-                # reconnect after 6 s (webcam: 3 s) without any frame.
-                stall_limit = 6.0 if isinstance(cap, _LatestFrameReader) else 3.0
+                # reconnect after 12 s (webcam: 3 s) without any frame. Reopening
+                # the 5G RTSP stream costs ~15 s, so don't drop it on a short hiccup.
+                stall_limit = 12.0 if isinstance(cap, _LatestFrameReader) else 3.0
                 if time.monotonic() - last_good_frame > stall_limit:
                     consecutive_failures = 0
                     last_good_frame = time.monotonic()

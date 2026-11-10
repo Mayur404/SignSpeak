@@ -104,6 +104,18 @@ WHITE = (245, 248, 252)
 DARK = (8, 12, 20)
 GREEN = (153, 211, 52)       # #34D399 in BGR
 
+def _env_ms(name: str, default: int) -> int:
+    try:
+        return max(1000, int(os.environ.get(name, "") or default))
+    except ValueError:
+        return default
+
+
+# Over the 5G link the Sparsh camera takes ~13-15 s to finish the RTSP
+# handshake and stream probe, so short open timeouts never connect.
+RTSP_OPEN_TIMEOUT_MS = _env_ms("CAMERA_OPEN_TIMEOUT_MS", 20000)
+RTSP_READ_TIMEOUT_MS = _env_ms("CAMERA_READ_TIMEOUT_MS", 5000)
+
 SPARSH_HOST = os.environ.get("CAMERA_HOST") or "10.101.0.74"
 SPARSH_PORT = 554
 SPARSH_STREAM_PATHS = {
@@ -746,8 +758,8 @@ class CameraWorker(QThread):
             for url in candidates:
                 try:
                     params = [
-                        cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000,
-                        cv2.CAP_PROP_READ_TIMEOUT_MSEC, 2000,
+                        cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT_MS,
+                        cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_READ_TIMEOUT_MS,
                     ]
                     try:
                         cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG, params)
