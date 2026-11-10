@@ -32,10 +32,23 @@ class _SarvamBackend:
         self.player = QMediaPlayer()
         self.player.setAudioOutput(self.output)
         self._buffer = None
+        # Connected once: the player outlives each utterance, so connecting
+        # per speak() stacked up handlers bound to finished event loops.
+        self._loop: QEventLoop | None = None
+        self.player.mediaStatusChanged.connect(self._on_media_status)
+        self.player.errorOccurred.connect(lambda *_: self._quit_loop())
         self.voices = [
             {"id": f"sarvam:{code}", "name": f"{name} · Sarvam Bulbul"}
             for name, code in SARVAM_LANGUAGES.items()
         ]
+
+    def _on_media_status(self, status) -> None:
+        if status == QMediaPlayer.MediaStatus.EndOfMedia:
+            self._quit_loop()
+
+    def _quit_loop(self) -> None:
+        if self._loop is not None:
+            self._loop.quit()
 
     def apply(self, voice_id: str, rate: int, volume: int) -> None:
         self.language = voice_id.removeprefix("sarvam:")
@@ -62,21 +75,25 @@ class _SarvamBackend:
             loop = QEventLoop()
             timer = QTimer()
             timer.setInterval(50)
-            timer.timeout.connect(lambda: self.player.stop() if cancel.is_set() else None)
-            timer.timeout.connect(lambda: loop.quit() if cancel.is_set() else None)
-            self.player.mediaStatusChanged.connect(
-                lambda status: loop.quit() if status == QMediaPlayer.MediaStatus.EndOfMedia else None
-            )
-            self.player.errorOccurred.connect(lambda *_: loop.quit())
+
+            def check_cancel() -> None:
+                if cancel.is_set():
+                    self.player.stop()
+                    loop.quit()
+
+            timer.timeout.connect(check_cancel)
+            self._loop = loop
             self.player.setSourceDevice(self._buffer)
             self.player.play()
             timer.start()
             on_start()
             loop.exec()
             timer.stop()
+            self._loop = None
             if self.player.error() != QMediaPlayer.Error.NoError:
                 raise RuntimeError(self.player.errorString() or "Audio playback failed.")
         finally:
+            self._loop = None
             self.player.stop()
             if self._buffer is not None:
                 self._buffer.close()

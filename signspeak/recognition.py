@@ -1,8 +1,6 @@
 """Model loading, prediction and temporal stabilisation."""
 from __future__ import annotations
 
-import pickle
-import warnings
 from collections import Counter, deque
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,7 +10,7 @@ import numpy as np
 
 from .features import FEATURE_DIMS, extract
 from .labels import LABELS, LEGACY_INDEX_TO_LABEL
-from .paths import LEGACY_MODEL, USER_MODEL
+from .paths import DEFAULT_MODEL, USER_MODEL
 
 
 class ModelLoadError(RuntimeError):
@@ -138,48 +136,14 @@ class SignClassifier:
             return None
 
 
-def _load_pickle(path: Path) -> Any:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        try:
-            from sklearn.exceptions import InconsistentVersionWarning
-
-            warnings.simplefilter("ignore", InconsistentVersionWarning)
-        except Exception:
-            pass
-        with path.open("rb") as handle:
-            return pickle.load(handle)
-
-
-def load_legacy_classifier(path: Path = LEGACY_MODEL) -> SignClassifier:
-    if not path.exists():
-        raise ModelLoadError(f"Bundled model not found: {path}")
-    try:
-        bundle = _load_pickle(path)
-    except Exception as exc:  # pragma: no cover - corrupted file
-        raise ModelLoadError(f"Could not load the bundled model: {exc}") from exc
-    model = bundle.get("model") if isinstance(bundle, dict) else bundle
-    if model is None:
-        raise ModelLoadError("Bundled model file has an unexpected format.")
-    classes = [LEGACY_INDEX_TO_LABEL[i] for i in range(len(LEGACY_INDEX_TO_LABEL))]
-    info = ModelInfo(
-        kind="legacy",
-        name="Bundled ASL model",
-        feature_mode="legacy42",
-        algorithm="Random Forest · 100 trees",
-        classes=len(classes),
-        samples=None,
-    )
-    return SignClassifier(model, info, classes)
-
-
 def load_user_classifier(path: Path = USER_MODEL) -> SignClassifier:
     if not path.exists():
-        fallback = APP_ROOT / "signmodel.joblib"
-        if fallback.exists():
-            path = fallback
+        # Only the default location falls back to the shipped demo model;
+        # an explicit path (e.g. a model being validated) must exist itself.
+        if path == USER_MODEL and DEFAULT_MODEL.exists():
+            path = DEFAULT_MODEL
         else:
-            raise ModelLoadError("You have not trained a personal model yet.")
+            raise ModelLoadError(f"Sign model not found: {path.name}")
     try:
         import joblib
 
@@ -220,7 +184,7 @@ def load_user_classifier(path: Path = USER_MODEL) -> SignClassifier:
             raise ModelLoadError("Personal model contains an invalid sample count.")
         info = ModelInfo(
             kind="user",
-            name="Your personal model",
+            name="Demo model" if path == DEFAULT_MODEL else "Your personal model",
             feature_mode=feature_mode,
             algorithm=str(bundle.get("algorithm", "Custom classifier")),
             accuracy=accuracy,
@@ -240,8 +204,6 @@ def load_user_classifier(path: Path = USER_MODEL) -> SignClassifier:
 def load_classifier(kind: str) -> SignClassifier:
     if kind == "user":
         return load_user_classifier()
-    if kind == "legacy":
-        return load_legacy_classifier()
     raise ModelLoadError(f"Unsupported model type: {kind}")
 
 
@@ -336,7 +298,6 @@ class Stabilizer:
             return RecognitionState(hand_present=False, armed=self._armed)
 
         self._last_seen = now_ms
-        self._none_since = None
         confidence = prediction.confidence if prediction else 0.0
         runner_up = prediction.top[1][1] if prediction and len(prediction.top) > 1 else 0.0
         decisive = prediction is not None and (
@@ -376,6 +337,10 @@ class Stabilizer:
             self._candidate = None
             self._candidate_since = None
         else:
+            # Reset only on a stable vote: clearing it on every frame meant
+            # "release_ms without a stable sign" could never elapse while the
+            # hand stayed in view, so double letters needed the hand removed.
+            self._none_since = None
             if stable != self._candidate:
                 self._candidate = stable
                 self._candidate_since = now_ms

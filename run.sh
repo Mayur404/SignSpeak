@@ -9,5 +9,9 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 source scripts/port.sh
 PORT=$(pick_port)
-echo "Open http://<this-machine-ip>:$PORT from your PC (Ctrl+C to stop)."
+SCHEME=https
+if [[ " $* " == *" --http "* ]] || grep -qiE '^WEB_HTTPS=(0|false|no|off)\s*$' .env 2>/dev/null; then
+    SCHEME=http
+fi
+echo "Open $SCHEME://<this-machine-ip>:$PORT from your PC (Ctrl+C to stop)."
 exec .venv/bin/python app.py --host 0.0.0.0 --port "$PORT" --no-browser "$@"

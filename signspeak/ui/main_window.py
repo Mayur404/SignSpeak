@@ -35,7 +35,7 @@ from PySide6.QtMultimedia import QAudioInput, QMediaCaptureSession, QMediaFormat
 from ..composer import TextComposer
 from ..config import Settings, save_settings
 from ..labels import display_name, is_custom_word_label, spoken_name
-from ..paths import USER_MODEL
+from ..paths import USER_MODEL, active_model_path
 from ..speech_input import TranscriptionThread
 from ..recognition import (
     ModelLoadError,
@@ -44,7 +44,7 @@ from ..recognition import (
 )
 from ..trainer import DatasetStore, TrainingResult
 from ..tts import SARVAM_LANGUAGES, SpeechEngine, _load_project_env
-from ..vision import CameraProbe, CameraWorker, shutdown_tracker
+from ..vision import LOCAL_CAMERA_ALIASES, CameraProbe, CameraWorker, shutdown_tracker
 from . import theme
 from .icons import make_icon
 from .pages.guide import GuidePage
@@ -124,7 +124,7 @@ class MainWindow(QMainWindow):
             self._set_side(self.side_speech, "Off", theme.FAINT)
 
         if start_camera:
-            current_cam = self.settings.camera_source if self.settings.camera_source else self.settings.camera_index
+            current_cam = self._current_camera()
             self._probe = CameraProbe(current_cam, self)
             self._probe.finishedList.connect(self._on_cameras_found)
             self._probe.start()
@@ -140,6 +140,19 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     # Construction
     # ------------------------------------------------------------------
+    def _current_camera(self) -> int | str:
+        """The selected camera: a webcam index or a stream URL.
+
+        settings.json is shared with the web app, which stores webcams as
+        "0" (or "browser"); treat those as the local camera index.
+        """
+        source = (self.settings.camera_source or "").strip()
+        if source.isdigit():
+            return int(source)
+        if not source or source.lower() in LOCAL_CAMERA_ALIASES:
+            return self.settings.camera_index
+        return source
+
     def _load_initial_classifier(self):
         self.settings.active_model = "user"
         return load_user_classifier()
@@ -354,7 +367,7 @@ class MainWindow(QMainWindow):
         if self._closing:
             return
         found = [(item[0], str(item[1])) for item in cameras]
-        current = self.settings.camera_source if self.settings.camera_source else self.settings.camera_index
+        current = self._current_camera()
         keys = [item[0] for item in found]
         if current not in keys:
             label = "Sparsh CCTV" if "192.168.128.10" in str(current) else f"Camera {current}"
@@ -364,7 +377,7 @@ class MainWindow(QMainWindow):
         self._start_camera_if_needed()
 
     def _sync_camera_combos(self) -> None:
-        current = self.settings.camera_source if self.settings.camera_source else self.settings.camera_index
+        current = self._current_camera()
         self.translate_page.set_cameras(self._cameras, current)
         self.settings_page.set_cameras(self._cameras, current)
 
@@ -818,7 +831,7 @@ class MainWindow(QMainWindow):
             self._training_thread = None
 
     def save_model_copy(self) -> None:
-        if not USER_MODEL.exists():
+        if not active_model_path().exists():
             self.show_toast("Train a personal model before saving a copy.", "info")
             return
         path, _ = QFileDialog.getSaveFileName(
@@ -831,7 +844,7 @@ class MainWindow(QMainWindow):
         if target.suffix.lower() != ".joblib":
             target = target.with_suffix(".joblib")
         try:
-            shutil.copy2(USER_MODEL, target)
+            shutil.copy2(active_model_path(), target)
         except OSError as exc:
             self.show_toast(f"Could not save model: {exc}", "error", 5000)
             return
@@ -870,7 +883,7 @@ class MainWindow(QMainWindow):
 
     def _update_model_ui(self) -> None:
         info = self.classifier.info
-        has_personal = USER_MODEL.exists()
+        has_personal = active_model_path().exists()
         self.translate_page.set_model_info(info)
         self.train_page.set_model_info(info, has_personal)
         self.settings_page.set_model_info(info, info.kind)

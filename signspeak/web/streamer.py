@@ -181,6 +181,11 @@ DARK_BG = (16, 13, 9)              # #090D10
 CARD_BG = (26, 20, 15)             # #0F141A
 WHITE = (250, 250, 250)
 GRAY = (140, 140, 140)
+# Offline/standby frame, matching the dashboard's dark video area (BGR).
+PLACEHOLDER_BG = (29, 17, 12)          # #0C111D
+PLACEHOLDER_ACCENT = (166, 184, 20)    # #14B8A6
+PLACEHOLDER_TEXT = (240, 236, 234)     # #EAECF0
+PLACEHOLDER_MUTED = (179, 162, 152)    # #98A2B3
 
 
 def _draw_rounded_rect(image, p1, p2, color, radius=10, thickness=-1, alpha=1.0) -> None:
@@ -194,6 +199,9 @@ class WebStreamEngine:
     def __init__(self, settings: Settings | None = None):
         self.settings = (settings or load_settings()).copy()
         self.composer = TextComposer()
+        # The camera worker commits signs while request threads run text
+        # actions (space, backspace, clear ...); serialize composer access.
+        self._composer_lock = threading.RLock()
 
         # The personal classifier is the only active model.
         self.classifier = None
@@ -229,7 +237,11 @@ class WebStreamEngine:
         self._last_error: str | None = None
         self._camera_connected = False
         self._camera_dims = (1280, 720)
+        # Recent commit events, each with an increasing "seq". Clients ask for
+        # events newer than the last seq they saw, so several viewers (phone +
+        # laptop) and extra /api/status calls never steal each other's speech.
         self._recent_events: list[dict[str, Any]] = []
+        self._event_seq = 0
 
         # Dataset and recording
         self.store = DatasetStore()
@@ -460,6 +472,24 @@ class WebStreamEngine:
             return box["cap"], False
 
     def _worker_loop(self) -> None:
+        """Run the capture loop, restarting it if an iteration crashes.
+
+        An unexpected error (a bad frame, a model or OpenCV exception) used to
+        end the thread silently and freeze the stream for every viewer.
+        """
+        while self._running:
+            try:
+                self._capture_loop()
+            except Exception as exc:  # keep the stream alive whatever happens
+                print(f"[camera] worker error, restarting: {exc!r}", flush=True)
+                self._last_error = f"Camera worker error: {exc}"
+                try:
+                    self._close_camera()
+                except Exception:
+                    self._cap = None
+                time.sleep(1.0)
+
+    def _capture_loop(self) -> None:
         """Main camera acquisition, hand detection, recognition & HUD loop."""
         consecutive_failures = 0
         open_failures = 0
@@ -677,18 +707,21 @@ class WebStreamEngine:
             if state.committed and self._is_repeat_word(state.committed):
                 state.committed = None
             if state.committed and not self._paused:
-                res = self.composer.commit(state.committed)
-                event = {
-                    "timestamp": time.time(),
-                    "sign": state.committed,
-                    "kind": res.kind,
-                    "word": self.composer.word,
-                    "transcript": self.composer.transcript,
-                    "speak_word": res.speak_word,
-                    "speak_sentence": res.speak_sentence,
-                }
+                with self._composer_lock:
+                    res = self.composer.commit(state.committed)
+                    word, transcript = self.composer.word, self.composer.transcript
                 with self._lock:
-                    self._recent_events.append(event)
+                    self._event_seq += 1
+                    self._recent_events.append({
+                        "seq": self._event_seq,
+                        "timestamp": time.time(),
+                        "sign": state.committed,
+                        "kind": res.kind,
+                        "word": word,
+                        "transcript": transcript,
+                        "speak_word": res.speak_word,
+                        "speak_sentence": res.speak_sentence,
+                    })
                     if len(self._recent_events) > 50:
                         self._recent_events.pop(0)
 
@@ -860,6 +893,8 @@ class WebStreamEngine:
         )
 
         # Right: FPS and Resolution
+        if not self.settings.show_fps:
+            return
         fps_label = f"{self._latest_fps:.1f} FPS  |  {w}x{h}"
         (fw, _), _ = cv2.getTextSize(fps_label, cv2.FONT_HERSHEY_DUPLEX, 0.45, 1)
         cv2.putText(
@@ -868,39 +903,28 @@ class WebStreamEngine:
         )
 
     def _render_placeholder_frame(self, message: str, source: str, hint: str | None = None) -> None:
-        """Create a futuristic standby placeholder frame when camera is offline."""
+        """Render a calm standby frame while the camera is offline."""
         w, h = 960, 540
         frame = np.zeros((h, w, 3), dtype=np.uint8)
-        frame[:] = DARK_BG
+        frame[:] = PLACEHOLDER_BG
 
-        # Grid lines for tech look
-        for x in range(0, w, 40):
-            cv2.line(frame, (x, 0), (x, h), (24, 20, 15), 1)
-        for y in range(0, h, 40):
-            cv2.line(frame, (0, y), (w, y), (24, 20, 15), 1)
+        # Soft pulsing status dot (keeps the stream visibly alive).
+        cx, cy = w // 2, h // 2 - 46
+        pulse = 0.5 + 0.5 * math.sin(time.time() * 3)
+        halo = frame.copy()
+        cv2.circle(halo, (cx, cy), int(14 + 8 * pulse), PLACEHOLDER_ACCENT, -1, cv2.LINE_AA)
+        cv2.addWeighted(halo, 0.25, frame, 0.75, 0, frame)
+        cv2.circle(frame, (cx, cy), 7, PLACEHOLDER_ACCENT, -1, cv2.LINE_AA)
 
-        # Glowing central card
-        cx1, cy1, cx2, cy2 = w // 2 - 240, h // 2 - 110, w // 2 + 240, h // 2 + 110
-        _draw_rounded_rect(frame, (cx1, cy1), (cx2, cy2), CARD_BG, 16, -1, 0.9)
-        _draw_rounded_rect(frame, (cx1, cy1), (cx2, cy2), ACCENT_CYAN, 16, 2, 0.8)
+        def centered(text: str, y: int, scale: float, color, thickness: int) -> None:
+            (tw, _), _ = text_size(text, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
+            put_text(frame, text, (w // 2 - tw // 2, y), cv2.FONT_HERSHEY_SIMPLEX,
+                     scale, color, thickness, cv2.LINE_AA)
 
-        # Pulsing radar dot
-        radar_cx, radar_cy = w // 2, h // 2 - 40
-        pulse = int(12 + 6 * math.sin(time.time() * 4))
-        cv2.circle(frame, (radar_cx, radar_cy), pulse + 8, (60, 45, 15), -1, cv2.LINE_AA)
-        cv2.circle(frame, (radar_cx, radar_cy), pulse, ACCENT_CYAN, -1, cv2.LINE_AA)
-
-        # Text
-        font = cv2.FONT_HERSHEY_DUPLEX
-        (tw, _), _ = cv2.getTextSize(message, font, 0.8, 2)
-        cv2.putText(frame, message, (w // 2 - tw // 2, h // 2 + 25), font, 0.8, WHITE, 2, cv2.LINE_AA)
-
-        src_text = f"Target: {_safe_camera_source(source)}"
-        (sw, _), _ = cv2.getTextSize(src_text, font, 0.5, 1)
-        cv2.putText(frame, src_text, (w // 2 - sw // 2, h // 2 + 60), font, 0.5, GRAY, 1, cv2.LINE_AA)
+        centered(message, h // 2 + 8, 0.78, PLACEHOLDER_TEXT, 2)
+        centered(_safe_camera_source(source), h // 2 + 40, 0.5, PLACEHOLDER_MUTED, 1)
         if hint:
-            (hw, _), _ = cv2.getTextSize(hint, font, 0.45, 1)
-            cv2.putText(frame, hint, (w // 2 - hw // 2, h // 2 + 88), font, 0.45, ACCENT_CYAN, 1, cv2.LINE_AA)
+            centered(hint, h // 2 + 68, 0.48, PLACEHOLDER_MUTED, 1)
 
         ret, jpeg_bytes = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
         if ret:
@@ -931,12 +955,29 @@ class WebStreamEngine:
                     b"Content-Type: image/jpeg\r\n\r\n" + frame_data + b"\r\n"
                 )
 
-    def get_state(self) -> dict[str, Any]:
-        """Return serializable system and recognition metrics for /api/status."""
+    def get_state(self, since: int | None = None) -> dict[str, Any]:
+        """Return serializable system and recognition metrics for /api/status.
+
+        ``events`` holds the commit events with ``seq > since``; without
+        ``since`` (a client's first poll, or a one-off status read) no events
+        are returned, so old words are never re-spoken. ``event_seq`` is the
+        value to pass as ``since`` next time.
+        """
         with self._lock:
             state = self._latest_state
-            evs = list(self._recent_events)
-            self._recent_events.clear()
+            event_seq = self._event_seq
+            if since is None:
+                evs = []
+            else:
+                evs = [dict(ev) for ev in self._recent_events if ev["seq"] > since]
+        with self._composer_lock:
+            composer_state = {
+                "word": self.composer.word,
+                "transcript": self.composer.transcript,
+                "sentence": self.composer.sentence,
+                "speak_text": self.composer.speak_text,
+                "tokens": list(self.composer.tokens),
+            }
 
         top_pairs = []
         if state.top:
@@ -969,7 +1010,7 @@ class WebStreamEngine:
             }
 
         raw_src = str(self._camera_source).strip()
-        env_host = os.environ.get("CAMERA_HOST", "10.101.0.74").strip()
+        env_host = os.environ.get("CAMERA_HOST", "").strip() or "10.101.0.74"
         if raw_src in ("0", "webcam", "laptop", BROWSER_SOURCE) or raw_src.isdigit():
             cam_mode = "laptop"
         elif "192.168.128.10" in raw_src:
@@ -1000,16 +1041,11 @@ class WebStreamEngine:
                 "paused": self._paused,
                 "top": top_pairs,
             },
-            "composer": {
-                "word": self.composer.word,
-                "transcript": self.composer.transcript,
-                "sentence": self.composer.sentence,
-                "speak_text": self.composer.speak_text,
-                "tokens": self.composer.tokens,
-            },
+            "composer": composer_state,
             "model": model_info,
             "settings": self.settings.to_dict(),
             "events": evs,
+            "event_seq": event_seq,
         }
 
     # ---- Actions ---------------------------------------------------------
@@ -1065,7 +1101,10 @@ class WebStreamEngine:
 
     def composer_action(self, action: str, param: str = "") -> dict[str, Any]:
         """Execute a text composition action."""
-        action = action.lower()
+        with self._composer_lock:
+            return self._composer_action_locked(action.lower(), param)
+
+    def _composer_action_locked(self, action: str, param: str) -> dict[str, Any]:
         if action == "space":
             res = self.composer.space()
         elif action == "period":
@@ -1104,7 +1143,7 @@ class WebStreamEngine:
         }
 
     def update_settings(self, values: dict[str, Any]) -> None:
-        """Update settings live."""
+        """Update settings live (all-or-nothing; raises on invalid values)."""
         self.settings.update(values)
         save_settings(self.settings)
         if self.engine:

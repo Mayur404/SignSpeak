@@ -132,6 +132,8 @@ SPARSH_STREAM_PATHS = {
     ),
 }
 SPARSH_CREDENTIALS = "admin:admin123"
+# camera_source values that mean "a local webcam", not a stream URL.
+LOCAL_CAMERA_ALIASES = ("webcam", "laptop", "cam0", "browser")
 
 
 def sparsh_stream_urls(host: str | None = None) -> list[tuple[str, str]]:
@@ -749,6 +751,14 @@ class CameraWorker(QThread):
 
     def _open_camera(self):
         source = (getattr(self.settings, "camera_source", "") or "").strip()
+        # The web app shares settings.json and saves webcams as "0" (or
+        # "browser" for a remote viewer's camera); those are local devices
+        # here, not stream URLs.
+        if source.isdigit():
+            self.settings.camera_index = int(source)
+            source = ""
+        elif source.lower() in LOCAL_CAMERA_ALIASES:
+            source = ""
         if source:
             # Handle RTSP / IP camera stream
             # Set this before opening each RTSP capture. Avoid FFmpeg's

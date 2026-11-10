@@ -19,7 +19,7 @@ from flask import Flask, Response, jsonify, render_template, request, send_file,
 from werkzeug.exceptions import HTTPException
 
 from ..labels import SIGN_HINTS, TRAIN_LABELS, display_name, is_trainable_label
-from ..paths import APP_ROOT, USER_MODEL
+from ..paths import APP_ROOT, USER_MODEL, active_model_path
 from ..recognition import ModelLoadError, load_user_classifier
 from ..speech_input import transcribe_audio
 from ..sarvam_env import SARVAM_LANGUAGES, _load_project_env, sarvam_api_key, sarvam_translate, sarvam_tts
@@ -141,8 +141,13 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
 
     @app.route("/api/status")
     def api_status():
-        """Live status of camera, recognition, text composer, and model."""
-        return jsonify(engine.get_state())
+        """Live status of camera, recognition, text composer, and model.
+
+        ``?since=<event_seq>`` returns the commit events newer than that
+        sequence number (see WebStreamEngine.get_state).
+        """
+        since = request.args.get("since", type=int)
+        return jsonify(engine.get_state(since))
 
     @app.route("/api/action", methods=["POST"])
     def api_action():
@@ -188,7 +193,12 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
                 return jsonify({"status": "error", "message": str(exc)}), 500
             env_host = new_5g_ip
         else:
-            env_host = os.environ.get("CAMERA_HOST", "10.101.0.74").strip()
+            # An empty CAMERA_HOST= line in .env must not yield "rtsp://...@:554".
+            env_host = os.environ.get("CAMERA_HOST", "").strip() or "10.101.0.74"
+
+        # A full stream URL is used exactly as given (e.g. the 4K main stream
+        # on the 5G camera); only a bare preset name or host maps to a preset.
+        is_url = "://" in source
 
         if mode in ("webcam", "laptop", "0", "cam0", "browser") or source in ("0", "webcam", "laptop", "browser"):
             # "Laptop webcam" means the viewer's own camera. When the dashboard
@@ -199,10 +209,10 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
                 use_browser = mode == "browser" or source == "browser" or not _is_local_request()
             resolved_source = "browser" if use_browser else "0"
             resolved_mode = "laptop"
-        elif mode in ("ethernet", "eth", "192.168.128.10") or "192.168.128.10" in source:
+        elif mode in ("ethernet", "eth", "192.168.128.10") or source == "192.168.128.10":
             resolved_source = "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=1.sdp"
             resolved_mode = "ethernet"
-        elif mode in ("5g", "sparsh", "wan", "wifi", "modem") or env_host in source or (not source and mode == "5g"):
+        elif mode in ("5g", "sparsh", "wan", "wifi", "modem") or (source and not is_url and source == env_host):
             resolved_source = f"rtsp://admin:admin123@{env_host}:554/avstream/channel=1/stream=1.sdp"
             resolved_mode = "5g"
         elif source:
@@ -285,7 +295,7 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
     def api_system():
         """Return system and 5G network configuration guide."""
         _load_project_env()
-        env_host = os.environ.get("CAMERA_HOST", "10.101.0.74").strip()
+        env_host = os.environ.get("CAMERA_HOST", "").strip() or "10.101.0.74"
         return jsonify({
             "ips": get_network_ips(),
             "camera_5g_host": env_host,
@@ -390,7 +400,7 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
 
     @app.route("/api/model/download")
     def api_model_download():
-        target = USER_MODEL if USER_MODEL.exists() else (APP_ROOT / "signmodel.joblib")
+        target = active_model_path()
         if target.exists():
             return send_file(target, as_attachment=True, download_name="user_model.joblib")
         return jsonify({"status": "error", "message": "No model file found"}), 404
@@ -524,6 +534,31 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
     return app
 
 
+def _port_is_free(host: str, port: int) -> bool:
+    """True if no other program is using ``port``.
+
+    The web server sets SO_REUSEADDR, which on Windows lets a second process
+    bind a port that is already taken (two SignSpeak copies then share it and
+    fight over the webcam). So probe with an exclusive bind, and also try to
+    connect, which catches a listener on a different local address.
+    """
+    bind_host = host or "0.0.0.0"
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):  # Windows
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        probe.bind((bind_host, port))
+    except OSError:
+        return False
+    finally:
+        probe.close()
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return False
+    except OSError:
+        return True
+
+
 def run_server(
     host: str = "0.0.0.0",
     port: int = 18473,
@@ -537,6 +572,16 @@ def run_server(
     https://. Browsers only allow the camera and microphone on secure origins.
     """
     engine = engine or WebStreamEngine()
+
+    # Fail fast with a clear message if the port is taken (e.g. another
+    # SignSpeak copy is still running), before the camera is opened.
+    if not _port_is_free(host, port):
+        engine.stop()
+        raise SystemExit(
+            f"\n  ERROR: port {port} is already in use - probably another SignSpeak copy is\n"
+            f"  still running. Close it, or set a different WEB_PORT in .env.\n"
+        )
+
     app = create_app(engine)
 
     ips = get_network_ips()

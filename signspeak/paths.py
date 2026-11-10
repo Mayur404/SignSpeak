@@ -10,13 +10,21 @@ MODELS_DIR = ASSETS_DIR / "models"
 DATA_DIR = APP_ROOT / "data"
 
 LANDMARKER_MODEL = MODELS_DIR / "hand_landmarker.task"
-LEGACY_MODEL = MODELS_DIR / "asl_legacy_rf.pkl"
 ASL_CHART = ASSETS_DIR / "asl_alphabet.png"
 
+# The demo sign model shipped with the app (A-Z, HELLO, NICE TO MEET YOU and
+# the Kannada word ಚೆನ್ನಾಗಿದೆಯಾ). It is used unless a model has been trained/uploaded into
+# data/, which then takes precedence.
+DEFAULT_MODEL = APP_ROOT / "demo_model.joblib"
 USER_MODEL = DATA_DIR / "user_model.joblib"
 USER_DATASET = DATA_DIR / "user_dataset.npz"
 SETTINGS_FILE = DATA_DIR / "settings.json"
 ENV_FILE = APP_ROOT / ".env"
+
+
+def active_model_path() -> Path:
+    """The model file in use: a trained/uploaded one, else the demo model."""
+    return USER_MODEL if USER_MODEL.exists() else DEFAULT_MODEL
 
 
 def load_env_file(path: Path = ENV_FILE) -> None:

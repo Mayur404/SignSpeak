@@ -11,7 +11,7 @@ import numpy as np
 
 from .features import DUAL_DIM, RICH_DIM
 from .labels import is_trainable_label
-from .paths import USER_DATASET, USER_MODEL
+from .paths import USER_DATASET, USER_MODEL, active_model_path
 
 MIN_SAMPLES_PER_CLASS = 5
 MAX_SAMPLES_PER_TAKE = 15
@@ -143,7 +143,7 @@ class DatasetStore:
         self.save()
 
     def has_model(self) -> bool:
-        return USER_MODEL.exists()
+        return active_model_path().exists()
 
 
 def _build_candidates():

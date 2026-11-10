@@ -17,7 +17,6 @@ from signspeak.recognition import (
     RecognitionEngine,
     SignClassifier,
     Stabilizer,
-    load_legacy_classifier,
     load_user_classifier,
 )
 from signspeak.trainer import DatasetStore, train_model
@@ -145,6 +144,33 @@ class RecognitionTests(unittest.TestCase):
                     for t in range(550, 1001, 50)]
         self.assertEqual(repeated.count("A"), 1)
 
+    def test_stabilizer_rearms_after_unclear_sign_while_hand_stays(self):
+        # Double letters: relax the hand (no stable sign) for release_ms
+        # without taking it out of view, then sign the same letter again.
+        stabilizer = Stabilizer(window=5, threshold=0.0, hold_ms=100, min_ratio=0.6,
+                                cooldown_ms=0, release_ms=200)
+        sign_a = Prediction("A", 0.95, [("A", 0.95)])
+        commits = [s.committed for s in (stabilizer.update(sign_a, True, t)
+                                         for t in range(0, 400, 50)) if s.committed]
+        for t in range(400, 1200, 50):
+            stabilizer.update(None, True, t)
+        commits += [s.committed for s in (stabilizer.update(sign_a, True, t)
+                                          for t in range(1200, 1800, 50)) if s.committed]
+        self.assertEqual(commits, ["A", "A"])
+
+    def test_stabilizer_brief_flicker_does_not_repeat_letter(self):
+        stabilizer = Stabilizer(window=5, threshold=0.0, hold_ms=100, min_ratio=0.6,
+                                cooldown_ms=0, release_ms=300)
+        sign_a = Prediction("A", 0.95, [("A", 0.95)])
+        commits = []
+        for t in range(0, 2000, 50):
+            # One unclear frame every 400 ms never breaks the 60% vote.
+            prediction = None if t % 400 == 0 and t else sign_a
+            state = stabilizer.update(prediction, True, t)
+            if state.committed:
+                commits.append(state.committed)
+        self.assertEqual(commits, ["A"])
+
     def test_stabilizer_ignores_ambiguous_frame_predictions(self):
         stabilizer = Stabilizer(window=5, threshold=0.0, hold_ms=100, min_ratio=0.6)
         ambiguous = Prediction("A", 0.52, [("A", 0.52), ("B", 0.50)])
@@ -170,12 +196,29 @@ class RecognitionTests(unittest.TestCase):
                 commits.append(state.committed)
         self.assertEqual(commits, ["A", "B"])
 
-    def test_bundled_model_predicts_legacy_vector(self):
-        classifier = load_legacy_classifier()
+    def test_default_model_loads_and_predicts(self):
+        from signspeak.paths import DEFAULT_MODEL
+
+        classifier = load_user_classifier(DEFAULT_MODEL)
+        self.assertEqual(classifier.info.name, "Demo model")
+        for word in ("HELLO", "NICE TO MEET YOU"):
+            self.assertTrue(any(word in label.upper() for label in classifier.classes), word)
         points = np.zeros((21, 3), dtype=np.float32)
-        prediction = classifier.predict(extract(points, "legacy42"))
+        prediction = classifier.predict(extract(points, classifier.feature_mode))
         self.assertIsNotNone(prediction)
         self.assertIn(prediction.label, classifier.classes)
+
+    def test_missing_trained_model_falls_back_to_default(self):
+        from signspeak.paths import DEFAULT_MODEL
+
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "signspeak.recognition.USER_MODEL", Path(directory) / "user_model.joblib"
+        ):
+            from signspeak import recognition
+
+            classifier = recognition.load_user_classifier(recognition.USER_MODEL)
+        self.assertEqual(classifier.info.name, "Demo model")
+        self.assertTrue(DEFAULT_MODEL.exists())
 
 
 class DatasetTests(unittest.TestCase):
@@ -252,6 +295,37 @@ class SettingsTests(unittest.TestCase):
             save_settings(settings, path)
             loaded = load_settings(path)
             self.assertEqual(loaded.camera_source, settings.camera_source)
+
+    def test_invalid_update_is_rejected_without_partial_changes(self):
+        settings = Settings(hold_ms=650)
+        with self.assertRaises((TypeError, ValueError)):
+            settings.update({"hold_ms": 700, "inference_width": "abc"})
+        # Nothing applied: the camera worker does int(inference_width) per frame.
+        self.assertEqual(settings.hold_ms, 650)
+        self.assertEqual(settings.inference_width, 800)
+
+    def test_update_coerces_text_booleans_and_numbers(self):
+        settings = Settings()
+        settings.update({"mirror": "false", "show_fps": "0", "hold_ms": "700"})
+        self.assertIs(settings.mirror, False)
+        self.assertIs(settings.show_fps, False)
+        self.assertEqual(settings.hold_ms, 700)
+
+    def test_one_corrupt_saved_field_keeps_the_others(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            path.write_text('{"hold_ms": 900, "inference_width": "abc"}', encoding="utf-8")
+            loaded = load_settings(path)
+        self.assertEqual(loaded.hold_ms, 900)
+        self.assertEqual(loaded.inference_width, 800)
+
+
+class ModelFallbackTests(unittest.TestCase):
+    def test_missing_explicit_model_path_raises_model_load_error(self):
+        from signspeak.recognition import ModelLoadError
+
+        with self.assertRaises(ModelLoadError):
+            load_user_classifier(Path("definitely-missing-model.joblib"))
 
 
 class CameraUrlTests(unittest.TestCase):

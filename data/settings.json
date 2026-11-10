@@ -1,6 +1,6 @@
 {
   "camera_index": 0,
-  "camera_source": "",
+  "camera_source": "0",
   "mirror": true,
   "inference_width": 800,
   "capture_delay": 3.0,

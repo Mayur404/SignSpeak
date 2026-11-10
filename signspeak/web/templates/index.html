@@ -6,247 +6,290 @@
   <title>SignSpeak — Sign Language to Speech</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&family=Cascadia+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* ==================================================================
+       Design tokens — light theme
+       ================================================================== */
     :root {
-      --bg: #F3F5F2;
-      --bg-soft: #FFFFFF;
+      --bg: #F5F6F8;
+      --surface: #FFFFFF;
+      --surface-2: #F9FAFB;
+      --surface-3: #F2F4F7;
+      --inset: #F9FAFB;
       --card: #FFFFFF;
-      --card-2: #F7F9F7;
-      --card-3: #EDF2EF;
-      --inset: #F8FAF8;
-      --border: #DDE4DF;
-      --border-strong: #BFCBC3;
-      --text: #202A25;
-      --muted: #5E6C64;
-      --faint: #7D8982;
-      --accent: #287A68;
-      --accent-dim: #236957;
-      --accent-soft: #EAF4F1;
-      --violet: #70618F;
-      --violet-soft: #F0EDF5;
-      --green: #28784B;
-      --green-soft: #EAF4ED;
-      --amber: #956A18;
-      --amber-soft: #FAF2E3;
-      --red: #B44740;
-      --red-soft: #F9ECEA;
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --font-mono: 'Cascadia Mono', 'JetBrains Mono', monospace;
+      --border: #E4E7EC;
+      --border-strong: #D0D5DD;
+      --text: #101828;
+      --muted: #475467;
+      --faint: #667085;
+      --placeholder: #98A2B3;
+
+      --accent: #0E7C6B;
+      --accent-dim: #0B6658;
+      --accent-soft: #ECF7F4;
+      --accent-line: #BFE3DA;
+
+      --green: #067647;
+      --green-soft: #ECFDF3;
+      --green-line: #ABEFC6;
+      --amber: #B54708;
+      --amber-soft: #FFFAEB;
+      --amber-line: #FEDF89;
+      --red: #B42318;
+      --red-soft: #FEF3F2;
+      --red-line: #FECDCA;
+      --violet: #5925DC;
+      --violet-soft: #F4F3FF;
+      --violet-line: #D9D6FE;
+
+      --radius-sm: 6px;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+      --shadow-lg: 0 12px 24px -6px rgba(16, 24, 40, 0.14), 0 4px 8px -4px rgba(16, 24, 40, 0.06);
+      --ring: 0 0 0 3px rgba(14, 124, 107, 0.16);
+
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html { -webkit-text-size-adjust: 100%; }
+
     body {
-      background-color: var(--bg);
+      background: var(--bg);
       color: var(--text);
       font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
       min-height: 100vh;
       display: flex;
       flex-direction: row;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: "cv11", "ss01";
     }
 
-    /* ====================================================================
-       1. SIDEBAR (Exact match to PySide6 QFrame#Sidebar)
-       ==================================================================== */
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    :focus-visible { outline: none; box-shadow: var(--ring); }
+
+    .num { font-variant-numeric: tabular-nums; }
+    .mono { font-family: var(--font-mono); font-size: 0.92em; }
+
+    /* ==================================================================
+       1. Sidebar
+       ================================================================== */
     aside#sidebar {
-      width: 240px;
-      min-width: 240px;
-      background: var(--bg-soft);
+      width: 248px;
+      min-width: 248px;
+      background: var(--surface);
       border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      padding: 22px 18px 18px 18px;
-      gap: 12px;
+      padding: 20px 16px 16px;
+      gap: 6px;
       height: 100vh;
       position: sticky;
       top: 0;
       user-select: none;
+      overflow-y: auto;
     }
 
     .brand-row {
       display: flex;
       align-items: center;
-      gap: 11px;
-      margin-bottom: 8px;
+      gap: 10px;
+      padding: 0 6px 18px;
     }
 
     .logomark {
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border-radius: 9px;
       background: var(--accent);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #FFFFFF;
-      font-size: 19px;
-      box-shadow: 0 2px 6px rgba(40, 122, 104, 0.25);
+      flex-shrink: 0;
+    }
+
+    .logomark svg {
+      width: 19px;
+      height: 19px;
+      fill: none;
+      stroke: #FFFFFF;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
     .brand-text h1 {
-      font-size: 19px;
-      font-weight: 700;
+      font-size: 16px;
+      font-weight: 650;
       color: var(--text);
-      line-height: 1.1;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
     }
 
     .brand-text p {
-      font-size: 9px;
-      font-weight: 700;
+      font-size: 12px;
       color: var(--faint);
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      margin-top: 2px;
+      line-height: 1.3;
     }
 
     .section-title {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--faint);
-      letter-spacing: 0.7px;
-      text-transform: uppercase;
-      margin-top: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.4;
     }
 
-    /* Nav Buttons */
+    .side-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--faint);
+      padding: 14px 8px 6px;
+    }
+
     .nav-list {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 2px;
     }
 
     .nav-btn {
       display: flex;
       align-items: center;
-      gap: 12px;
-      height: 42px;
-      padding: 0 14px;
-      border-radius: 9px;
-      border: 1px solid transparent;
+      gap: 10px;
+      height: 38px;
+      padding: 0 10px;
+      border-radius: var(--radius);
+      border: none;
       background: transparent;
       color: var(--muted);
-      font-size: 13.5px;
+      font-size: 14px;
       font-weight: 500;
       font-family: inherit;
       cursor: pointer;
-      transition: all 0.15s ease;
       text-align: left;
+      transition: background-color 0.12s ease, color 0.12s ease;
     }
 
     .nav-btn svg {
       width: 18px;
       height: 18px;
       fill: none;
-      stroke: var(--muted);
-      stroke-width: 2;
+      stroke: currentColor;
+      stroke-width: 1.8;
       stroke-linecap: round;
       stroke-linejoin: round;
-      transition: stroke 0.15s ease;
+      color: var(--faint);
+      transition: color 0.12s ease;
     }
 
-    .nav-btn:hover {
-      background: #F3F5F2;
-      color: var(--text);
-    }
+    .nav-btn:hover { background: var(--surface-3); color: var(--text); }
+    .nav-btn.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .nav-btn.active svg { color: var(--accent); }
 
-    .nav-btn.active {
-      background: var(--accent-soft);
-      border-color: #C9E1D9;
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    .nav-btn.active svg {
-      stroke: var(--accent);
-    }
-
-    /* Inset Box */
     .inset-card {
       background: var(--inset);
       border: 1px solid var(--border);
-      border-radius: 9px;
+      border-radius: var(--radius);
       padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 9px;
     }
 
     .status-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 10px;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--muted);
     }
 
-    .status-row .lbl {
-      color: var(--faint);
-    }
+    .status-row .lbl { color: var(--faint); }
 
     .status-row .val {
-      font-weight: 700;
-      color: var(--muted);
-      font-family: var(--font-mono);
+      font-weight: 500;
+      color: var(--text);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #sidebar .status-row .val::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--placeholder);
+      margin-right: 7px;
+      vertical-align: 1px;
     }
 
     .status-row .val.green { color: var(--green); }
     .status-row .val.amber { color: var(--amber); }
+    #sidebar .status-row .val.green::before { background: #17B26A; }
+    #sidebar .status-row .val.amber::before { background: #F79009; }
 
-    /* Tip Card */
     .tip-card {
-      background: var(--inset);
+      margin-top: 14px;
+      background: var(--surface-2);
       border: 1px solid var(--border);
-      border-radius: 9px;
-      padding: 13px;
+      border-radius: var(--radius);
+      padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
     }
 
-    .tip-card h4 {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .tip-card p {
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.4;
-    }
+    .tip-card h4 { font-size: 13px; font-weight: 600; color: var(--text); }
+    .tip-card p { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
 
     .tip-btn {
       align-self: flex-start;
-      margin-top: 4px;
+      margin-top: 6px;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      font-size: 12px;
+      gap: 4px;
+      font-size: 13px;
       font-weight: 600;
+      font-family: inherit;
       color: var(--accent);
       background: transparent;
       border: none;
       cursor: pointer;
-      padding: 2px 0;
+      padding: 0;
     }
+
+    .tip-btn:hover { color: var(--accent-dim); }
+    .tip-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
     .sidebar-footer {
       margin-top: auto;
+      padding: 14px 8px 0;
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      font-size: 9.5px;
+      gap: 2px;
+      font-size: 12px;
       color: var(--faint);
     }
 
-    /* ====================================================================
-       2. WORKSPACE CONTENT AREA (Right of sidebar)
-       ==================================================================== */
+    /* ==================================================================
+       2. Workspace
+       ================================================================== */
     main#content {
       flex: 1;
+      min-width: 0;
       background: var(--bg);
-      padding: 24px 30px 24px 30px;
+      padding: 28px 32px 32px;
       overflow-y: auto;
       max-height: 100vh;
     }
@@ -254,111 +297,121 @@
     .page-view {
       display: none;
       flex-direction: column;
-      gap: 18px;
-      max-width: 1400px;
+      gap: 20px;
+      max-width: 1360px;
       margin: 0 auto;
     }
 
-    .page-view.active {
-      display: flex;
-    }
+    .page-view.active { display: flex; }
 
-    /* Page Header */
     .page-header {
       display: flex;
-      align-items: flex-start;
+      align-items: flex-end;
       justify-content: space-between;
       gap: 16px;
+      flex-wrap: wrap;
     }
 
     .page-title-group h2 {
-      font-size: 29px;
+      font-size: 24px;
       font-weight: 650;
       color: var(--text);
       letter-spacing: -0.02em;
+      line-height: 1.25;
     }
 
     .page-title-group p {
-      font-size: 13px;
+      font-size: 14px;
       color: var(--muted);
       margin-top: 4px;
+      max-width: 680px;
     }
 
     .header-actions {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
-    /* Pills */
+    /* Status pills (tone set from JS) */
     .pill {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 4px 10px;
-      border-radius: 11px;
-      font-size: 11px;
-      font-weight: 600;
+      height: 24px;
+      padding: 0 10px 0 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1;
+      white-space: nowrap;
       border: 1px solid var(--border);
-      background: #F2F5F3;
+      background: var(--surface);
       color: var(--muted);
-      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
     }
 
-    .pill[tone="violet"] {
-      background: var(--violet-soft);
-      border-color: #D9D1E7;
-      color: var(--violet);
+    .pill::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.85;
     }
 
-    .pill[tone="green"] {
-      background: var(--green-soft);
-      border-color: #CDE4D3;
-      color: var(--green);
-    }
-
-    .pill[tone="amber"] {
-      background: var(--amber-soft);
-      border-color: #EBD9B5;
-      color: var(--amber);
-    }
-
-    .pill[tone="red"] {
-      background: var(--red-soft);
-      border-color: #EBCBC7;
-      color: var(--red);
-    }
+    .pill[tone="violet"] { background: var(--violet-soft); border-color: var(--violet-line); color: var(--violet); }
+    .pill[tone="green"]  { background: var(--green-soft);  border-color: var(--green-line);  color: var(--green); }
+    .pill[tone="amber"]  { background: var(--amber-soft);  border-color: var(--amber-line);  color: var(--amber); }
+    .pill[tone="red"]    { background: var(--red-soft);    border-color: var(--red-line);    color: var(--red); }
 
     /* Cards */
     .card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 13px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-xs);
       overflow: hidden;
       display: flex;
       flex-direction: column;
     }
 
-    /* Split layout on Translate Page: Left (3) : Right (2) */
+    .card-pad { padding: 20px; gap: 14px; }
+
+    .card-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 28px;
+    }
+
+    .card-meta {
+      font-size: 13px;
+      color: var(--faint);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .muted-text { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .faint-text { font-size: 12.5px; color: var(--faint); line-height: 1.5; }
+
+    /* ---- Translate page --------------------------------------------- */
     .translate-grid {
       display: grid;
-      grid-template-columns: 1.45fr 1fr;
-      gap: 18px;
+      grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
     }
 
     @media (max-width: 1100px) {
       .translate-grid { grid-template-columns: 1fr; }
     }
 
-    /* Left Video Section */
-    .video-card {
-      display: flex;
-      flex-direction: column;
-    }
+    .video-card { display: flex; flex-direction: column; }
 
     .video-viewport {
-      background: #000;
+      background: #0C111D;
       aspect-ratio: 16 / 9;
       width: 100%;
       position: relative;
@@ -378,142 +431,114 @@
     .video-controls {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 14px 16px;
-      background: #FFFFFF;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 14px;
+      background: var(--surface);
       border-top: 1px solid var(--border);
     }
 
     .fps-lbl {
-      font-size: 12px;
-      color: var(--muted);
-      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--faint);
+      font-variant-numeric: tabular-nums;
+      min-width: 48px;
     }
+
+    .spacer { flex: 1; }
 
     .icon-btn {
       width: 36px;
       height: 36px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: #FFFFFF;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      color: var(--text);
-      transition: all 0.15s ease;
+      color: var(--muted);
+      box-shadow: var(--shadow-xs);
+      transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
     }
 
-    .icon-btn:hover {
-      background: var(--inset);
-      border-color: var(--border-strong);
-    }
+    .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+    .icon-btn.active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+    .icon-btn.sm { width: 32px; height: 32px; }
 
-    .icon-btn.active {
-      background: var(--accent-soft);
-      border-color: #C9E1D9;
-      color: var(--accent);
-    }
+    .select-cam { width: 176px; height: 36px; text-overflow: ellipsis; }
 
-    .select-cam {
-      padding: 7px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: #FFFFFF;
-      color: var(--text);
-      font-size: 12px;
-      font-weight: 500;
-      font-family: inherit;
-      outline: none;
-      min-width: 210px;
-      cursor: pointer;
-    }
-
-    .select-cam:focus {
-      border-color: var(--accent);
-    }
+    .ip-group { display: inline-flex; align-items: center; gap: 6px; }
+    .ip-group input[type="text"] { width: 116px; height: 36px; font-family: var(--font-mono); font-size: 13px; }
 
     .hint-row {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 8px;
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 8px;
-      padding: 0 4px;
+      font-size: 13px;
+      color: var(--faint);
+      margin-top: 10px;
+      padding: 0 2px;
+      line-height: 1.45;
     }
 
-    /* Right Column Cards */
+    .hint-row svg { flex-shrink: 0; margin-top: 2px; }
+
     .right-column {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 16px;
+      min-width: 0;
     }
 
-    /* Detected Sign Card with SignDial */
-    .detected-card {
-      padding: 18px;
-    }
+    /* Detected sign + dial */
+    .detected-card { padding: 20px; }
 
     .detect-inner {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 20px;
     }
 
-    /* SignDial SVG & Canvas */
     .dial-wrap {
-      width: 170px;
-      height: 170px;
+      width: 164px;
+      height: 164px;
       position: relative;
       flex-shrink: 0;
     }
 
-    .dial-svg {
-      width: 100%;
-      height: 100%;
-      transform: rotate(-90deg);
-    }
-
-    .dial-track {
-      fill: none;
-      stroke: #E0E6E2;
-      stroke-width: 9;
-    }
+    .dial-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .dial-track { fill: none; stroke: var(--surface-3); stroke-width: 8; }
 
     .dial-progress {
       fill: none;
       stroke: var(--accent);
-      stroke-width: 9;
+      stroke-width: 8;
       stroke-linecap: round;
       transition: stroke 0.2s ease;
     }
 
     .dial-disc {
       position: absolute;
-      top: 14px;
-      left: 14px;
-      right: 14px;
-      bottom: 14px;
+      inset: 14px;
       border-radius: 50%;
-      background: #FFFFFF;
+      background: var(--surface);
       border: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
       overflow: hidden;
       padding: 14px;
-      box-sizing: border-box;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
     }
 
     .dial-char {
       font-size: 60px;
-      font-weight: 700;
-      color: var(--accent);
+      font-weight: 650;
+      color: var(--text);
       line-height: 1.05;
-      font-family: var(--font-sans);
+      letter-spacing: -0.02em;
       max-width: 100%;
       text-align: center;
       overflow-wrap: anywhere;
@@ -525,22 +550,16 @@
     }
 
     .dial-caption {
-      font-size: 9px;
+      font-size: 10px;
       font-weight: 600;
-      letter-spacing: 1.2px;
+      letter-spacing: 0.06em;
       color: var(--faint);
-      margin-top: 4px;
+      margin-top: 6px;
       text-transform: uppercase;
     }
 
-    .dial-disc.flash {
-      background: #EAF4ED;
-      border-color: #CDE4D3;
-    }
-
-    .dial-disc.flash .dial-char {
-      color: var(--green);
-    }
+    .dial-disc.flash { background: var(--green-soft); border-color: var(--green-line); }
+    .dial-disc.flash .dial-char { color: var(--green); }
 
     .detect-info {
       flex: 1;
@@ -548,34 +567,37 @@
       overflow-wrap: anywhere;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
     }
+
+    .eyebrow { font-size: 13px; font-weight: 500; color: var(--faint); }
 
     .detect-info h3 {
-      font-size: 17px;
-      font-weight: 650;
+      font-size: 18px;
+      font-weight: 600;
       color: var(--text);
+      line-height: 1.35;
     }
 
-    .detect-info p {
-      font-size: 12px;
-      color: var(--muted);
-    }
+    .detect-info p { font-size: 13px; color: var(--muted); }
 
     .conf-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 12px;
-      margin-top: 4px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 12px;
     }
 
+    .conf-value { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+
     .conf-bar-bg {
-      height: 7px;
-      background: #E0E6E2;
-      border-radius: 4px;
+      height: 6px;
+      background: var(--surface-3);
+      border-radius: 999px;
       overflow: hidden;
-      margin-top: 2px;
+      margin-top: 6px;
     }
 
     .conf-bar-fill {
@@ -583,111 +605,105 @@
       height: 100%;
       width: 0%;
       background: var(--accent);
-      border-radius: 4px;
+      border-radius: 999px;
       transition: width 0.25s ease-out;
     }
 
-    /* Current Word Card */
-    .word-card {
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .card-header-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
+    /* Current word */
+    .word-card, .transcript-card { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
 
     .word-field {
-      height: 48px;
-      background: var(--inset);
+      height: 52px;
+      background: var(--surface-2);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--radius);
       padding: 0 16px;
-      font-size: 22px;
-      font-weight: 700;
-      font-family: var(--font-mono);
+      font-size: 24px;
+      font-weight: 600;
       color: var(--text);
       display: flex;
       align-items: center;
-      letter-spacing: 2px;
+      letter-spacing: 0.08em;
+      overflow: hidden;
+      white-space: nowrap;
     }
 
     .word-field:empty::before {
-      content: "Waiting…";
-      color: var(--faint);
+      content: "Waiting for a sign…";
+      color: var(--placeholder);
       font-weight: 400;
-      font-family: var(--font-sans);
-      font-size: 15px;
+      font-size: 14px;
       letter-spacing: normal;
     }
 
     .btn-group {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 8px;
     }
 
-    /* Buttons matching PySide6 Qt theme */
+    /* Buttons */
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 13px;
+      height: 36px;
+      padding: 0 14px;
+      border-radius: var(--radius);
+      font-size: 13.5px;
       font-weight: 500;
       font-family: inherit;
+      line-height: 1;
+      white-space: nowrap;
       cursor: pointer;
-      transition: all 0.15s ease;
-      border: 1px solid var(--border);
-      background: var(--card);
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
       color: var(--text);
+      box-shadow: var(--shadow-xs);
+      transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
     }
 
-    .btn:hover {
-      background: var(--inset);
-      border-color: var(--border-strong);
-    }
+    .btn svg { flex-shrink: 0; }
+    .btn:hover { background: var(--surface-2); }
+    .btn:disabled, .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .btn.sm { height: 32px; padding: 0 11px; font-size: 13px; }
+    .btn.lg { height: 40px; }
+    .btn.block { flex: 1; }
 
     .btn-primary {
       background: var(--accent);
+      border-color: var(--accent);
       color: #FFFFFF;
-      border: 1px solid var(--accent);
       font-weight: 600;
     }
 
-    .btn-primary:hover {
-      background: var(--accent-dim);
-      border-color: var(--accent-dim);
+    .btn-primary:hover { background: var(--accent-dim); border-color: var(--accent-dim); }
+    .btn-primary:disabled,
+    .btn-primary:disabled:hover {
+      background: var(--surface-3);
+      border-color: var(--border);
+      color: var(--faint);
+      box-shadow: none;
+      opacity: 1;
     }
 
-    .btn-ghost {
-      background: #FFFFFF;
-      border: 1px solid var(--border);
-      color: var(--text);
-    }
+    .btn-ghost { background: var(--surface); }
+    .btn-ghost.active { background: var(--red-soft); border-color: var(--red-line); color: var(--red); }
 
-    /* Transcript Card */
-    .transcript-card {
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+    .btn-danger { color: var(--red); }
+    .btn-danger:hover { background: var(--red-soft); border-color: var(--red-line); }
 
+    /* Transcript */
     .transcript-area {
-      min-height: 120px;
-      max-height: 200px;
-      background: var(--inset);
+      min-height: 124px;
+      max-height: 210px;
+      background: var(--surface-2);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--radius);
       padding: 12px 14px;
-      font-size: 14.5px;
+      font-size: 15px;
       line-height: 1.6;
       color: var(--text);
       overflow-y: auto;
@@ -695,165 +711,223 @@
     }
 
     .transcript-area:empty::before {
-      content: "Your sentence will appear here…";
-      color: var(--faint);
-      font-style: italic;
+      content: "Your sentence will appear here.";
+      color: var(--placeholder);
     }
 
     .footer-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
       gap: 10px;
     }
 
-    /* Mini Toggles matching MiniToggle */
+    /* Segmented toggles */
     .toggle-chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 5px 10px;
-      border-radius: 8px;
-      background: var(--inset);
-      border: 1px solid var(--border);
-      font-size: 11.5px;
+      height: 32px;
+      padding: 0 12px;
+      border-radius: var(--radius);
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      font-size: 13px;
       font-weight: 500;
       color: var(--muted);
       cursor: pointer;
       user-select: none;
+      transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
     }
 
-    .toggle-chip.active {
-      background: var(--accent-soft);
-      border-color: #C9E1D9;
-      color: var(--accent);
-      font-weight: 600;
+    .toggle-chip::before {
+      content: "";
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1.5px solid var(--border-strong);
+      background: var(--surface) center / 10px no-repeat;
+    }
+
+    .toggle-chip.active { color: var(--text); }
+
+    .toggle-chip.active::before {
+      background-color: var(--accent);
+      border-color: var(--accent);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.5l4.5-5' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     }
 
     .shortcut-hint {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 11.5px;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      font-size: 12.5px;
       color: var(--faint);
-      padding: 0 4px;
-      margin-top: 4px;
+      padding: 0 2px;
     }
 
-    /* ====================================================================
-       3. OTHER PAGES (Train, Guide, Settings)
-       ==================================================================== */
-    /* Guide Page */
-    .guide-card {
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+    .shortcut-hint > span { display: inline-flex; align-items: center; gap: 6px; }
+
+    kbd {
+      display: inline-flex;
+      align-items: center;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 5px;
+      border: 1px solid var(--border-strong);
+      border-bottom-width: 2px;
+      background: var(--surface);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
     }
+
+    /* ---- Guide ------------------------------------------------------ */
+    .guide-card { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
 
     .guide-image-wrap {
-      border-radius: 10px;
+      border-radius: var(--radius);
       overflow: hidden;
-      border: 1px solid var(--border);
-      background: #FFFFFF;
+      background: var(--surface);
       text-align: center;
-      padding: 10px;
     }
 
-    .guide-image-wrap img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 8px;
-    }
+    .guide-image-wrap img { max-width: 100%; height: auto; display: inline-block; }
 
-    /* Settings Page */
+    /* ---- Settings --------------------------------------------------- */
     .settings-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 20px;
+      align-items: start;
     }
 
     @media (max-width: 1000px) {
       .settings-grid { grid-template-columns: 1fr; }
     }
 
-    .setting-group {
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
+    .setting-group { padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+
+    .setting-group > .section-title,
+    .setting-group > .card-header-row .section-title { font-size: 15px; }
+
+    .setting-group > .section-title,
+    .setting-group > .card-header-row {
+      padding-bottom: 14px;
+      margin-bottom: -2px;
+      border-bottom: 1px solid var(--border);
     }
 
-    .setting-row {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+    .setting-row { display: flex; flex-direction: column; gap: 6px; }
 
     .setting-row-h {
       display: flex;
-      align-items: center;
+      align-items: baseline;
       justify-content: space-between;
+      gap: 12px;
     }
 
-    .setting-lbl {
+    .setting-lbl { font-size: 13.5px; font-weight: 500; color: var(--text); }
+    .setting-sub { font-size: 12.5px; color: var(--faint); line-height: 1.45; }
+
+    .setting-val {
       font-size: 13px;
       font-weight: 600;
       color: var(--text);
+      font-variant-numeric: tabular-nums;
     }
 
-    .setting-sub {
-      font-size: 11.5px;
-      color: var(--muted);
+    .subgroup-title { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 13.5px;
+      color: var(--text);
     }
 
     input[type="text"], select {
       height: 38px;
       padding: 0 12px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: #FFFFFF;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background-color: var(--surface);
       color: var(--text);
-      font-size: 13px;
+      font-size: 13.5px;
       font-family: inherit;
       outline: none;
+      box-shadow: var(--shadow-xs);
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+      min-width: 0;
     }
+
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      padding-right: 34px;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23667085' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 16px;
+    }
+
+    input[type="text"]::placeholder { color: var(--placeholder); }
 
     input[type="text"]:focus, select:focus {
       border-color: var(--accent);
+      box-shadow: var(--ring);
+    }
+
+    select:disabled { background-color: var(--surface-3); color: var(--faint); cursor: not-allowed; }
+
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
     }
 
     input[type="range"] {
       width: 100%;
       accent-color: var(--accent);
+      cursor: pointer;
+      margin: 2px 0;
     }
 
-    /* Toast Notification (matching Toast widget) */
+    /* Toast */
     .toast-box {
       position: fixed;
       bottom: 24px;
       right: 24px;
-      background: #FFFFFF;
-      border: 1px solid var(--border-strong);
-      border-radius: 12px;
-      padding: 12px 18px;
-      color: var(--text);
-      font-size: 13px;
-      font-weight: 600;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      max-width: min(420px, calc(100vw - 48px));
+      background: #101828;
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: #FFFFFF;
+      font-size: 13.5px;
+      font-weight: 500;
+      line-height: 1.45;
+      box-shadow: var(--shadow-lg);
       display: none;
       align-items: center;
       gap: 10px;
       z-index: 1000;
     }
-    /* ====================================================================
-       4. TRAIN PAGE STYLES (Matching PySide6 TrainPage)
-       ==================================================================== */
+
+    /* ---- Train page ------------------------------------------------- */
     .train-top-row {
       display: grid;
-      grid-template-columns: 1.45fr 1fr;
-      gap: 16px;
+      grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+      gap: 20px;
     }
+
     @media (max-width: 1050px) {
       .train-top-row { grid-template-columns: 1fr; }
     }
@@ -861,55 +935,105 @@
     .train-bottom-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 20px;
     }
+
     @media (max-width: 900px) {
       .train-bottom-row { grid-template-columns: 1fr; }
     }
 
-    .btn-danger {
-      background: #FFFFFF;
-      border: 1px solid var(--red-soft);
-      color: var(--red);
-      font-weight: 500;
-    }
-    .btn-danger:hover {
-      background: var(--red-soft);
-      border-color: var(--red);
+    .preview-viewport { border-radius: var(--radius); min-height: 240px; }
+
+    .stream-fallback {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #98A2B3;
+      gap: 4px;
+      text-align: center;
     }
 
+    .stream-fallback strong { font-size: 14px; font-weight: 600; color: #D0D5DD; }
+    .stream-fallback span { font-size: 12.5px; }
+
+    .selected-sign {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 16px;
+      background: var(--surface-2);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    #selectedTrainLabelBig {
+      font-size: 44px;
+      font-weight: 650;
+      color: var(--accent);
+      line-height: 1;
+      min-width: 56px;
+      text-align: center;
+      letter-spacing: -0.02em;
+    }
+
+    .selected-sign-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    #selectedTrainName { font-size: 16px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+    #selectedTrainCounts { font-size: 13px; color: var(--faint); font-variant-numeric: tabular-nums; }
+    #selectedTrainHint { font-size: 13px; color: var(--muted); line-height: 1.5; min-height: 38px; }
+
+    .field-pair { display: flex; gap: 12px; }
+    .field { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .field-label { font-size: 13px; font-weight: 500; color: var(--muted); }
+
+    .card-actions-footer {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .row { display: flex; gap: 8px; }
+    .row > input[type="text"] { flex: 1; }
+
     .progress-bar-container {
-      height: 8px;
-      background: #E0E6E2;
-      border-radius: 4px;
+      height: 6px;
+      background: var(--surface-3);
+      border-radius: 999px;
       overflow: hidden;
       width: 100%;
     }
+
     .progress-bar-fill {
       height: 100%;
       background: var(--accent);
       width: 0%;
       transition: width 0.15s linear;
-      border-radius: 4px;
+      border-radius: 999px;
     }
 
     .train-grid-container {
       display: grid;
-      grid-template-columns: repeat(13, 1fr);
-      gap: 6px;
+      grid-template-columns: repeat(13, minmax(0, 1fr));
+      gap: 8px;
     }
+
     @media (max-width: 1100px) {
-      .train-grid-container { grid-template-columns: repeat(9, 1fr); }
+      .train-grid-container { grid-template-columns: repeat(9, minmax(0, 1fr)); }
     }
+
     @media (max-width: 750px) {
-      .train-grid-container { grid-template-columns: repeat(6, 1fr); }
+      .train-grid-container { grid-template-columns: repeat(6, minmax(0, 1fr)); }
     }
 
     .letter-tile {
       aspect-ratio: 1 / 1;
-      border-radius: 12px;
+      border-radius: var(--radius);
       border: 1px solid var(--border);
-      background: #FFFFFF;
+      background: var(--surface);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -917,22 +1041,22 @@
       position: relative;
       cursor: pointer;
       user-select: none;
-      transition: all 0.12s ease;
+      transition: background-color 0.12s ease, border-color 0.12s ease;
       padding: 3px;
       min-width: 0;
     }
-    .letter-tile:hover {
-      background: #F1F5F2;
-      border-color: var(--border-strong);
-    }
+
+    .letter-tile:hover { background: var(--surface-2); border-color: var(--border-strong); }
+
     .letter-tile.active {
-      background: rgba(30, 107, 79, 0.08);
+      background: var(--accent-soft);
       border-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent);
+      box-shadow: inset 0 0 0 1px var(--accent);
     }
+
     .tile-label {
       font-size: 16px;
-      font-weight: 700;
+      font-weight: 600;
       color: var(--text);
       line-height: 1.1;
       white-space: nowrap;
@@ -941,85 +1065,100 @@
       max-width: 100%;
       text-align: center;
     }
-    .letter-tile.active .tile-label {
-      color: var(--accent);
-    }
+
+    .letter-tile.active .tile-label { color: var(--accent); }
+
     .tile-count {
-      font-size: 8px;
-      font-weight: 600;
+      font-size: 10px;
+      font-weight: 500;
       color: var(--faint);
       margin-top: 2px;
-      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
     }
-    .tile-count.green {
-      color: var(--green);
-    }
+
+    .tile-count.green { color: var(--green); }
+
     .tile-bar-bg {
       position: absolute;
-      bottom: 4px;
-      left: 6px;
-      right: 6px;
+      bottom: 5px;
+      left: 8px;
+      right: 8px;
       height: 2px;
       border-radius: 1px;
-      background: transparent;
+      background: var(--surface-3);
       overflow: hidden;
     }
-    .tile-bar-fill {
-      height: 100%;
-      border-radius: 1px;
-      background: var(--accent);
-    }
-    .tile-bar-fill.green {
-      background: var(--green);
+
+    .tile-bar-fill { height: 100%; border-radius: 1px; background: var(--accent); }
+    .tile-bar-fill.green { background: #17B26A; }
+
+    #cardModelName { font-size: 17px; font-weight: 600; color: var(--text); }
+    #cardModelDetail { font-size: 13px; color: var(--muted); }
+    #cardModelAccuracy { font-size: 13px; font-weight: 500; color: var(--green); line-height: 1.45; font-variant-numeric: tabular-nums; }
+
+    @media (max-width: 760px) {
+      body { flex-direction: column; }
+      aside#sidebar {
+        width: 100%; min-width: 0; height: auto; position: sticky; top: 0; z-index: 10;
+        flex-direction: row; align-items: center; gap: 4px; padding: 10px 12px;
+        border-right: none; border-bottom: 1px solid var(--border); overflow-x: auto;
+      }
+      .brand-row { padding: 0 6px 0 0; }
+      .brand-text p, .side-label, #sidebar .inset-card, .tip-card, .sidebar-footer { display: none; }
+      .nav-list { flex-direction: row; gap: 2px; }
+      .nav-btn { height: 36px; padding: 0 9px; }
+      .nav-btn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+      main#content { max-height: none; padding: 20px 16px; }
+      .detect-inner { flex-direction: column; align-items: stretch; }
+      .dial-wrap { align-self: center; }
+      .select-cam { width: auto; flex: 1 1 150px; }
     }
   </style>
 </head>
 <body>
 
   <!-- ==================================================================
-       LEFT SIDEBAR (MainWindow QFrame#Sidebar)
+       Sidebar
        ================================================================== -->
   <aside id="sidebar">
-    <!-- Brand -->
     <div class="brand-row">
-      <div class="logomark">✋</div>
+      <div class="logomark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+      </div>
       <div class="brand-text">
         <h1>SignSpeak</h1>
-        <p>Sign Language · Speech</p>
+        <p>Sign language to speech</p>
       </div>
     </div>
 
-    <!-- Workspace Navigation -->
-    <div class="section-title">WORKSPACE</div>
     <div class="nav-list">
       <button class="nav-btn active" id="navTranslate" onclick="setPage('translate')">
-        <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
         <span>Translate</span>
       </button>
       <button class="nav-btn" id="navTrain" onclick="setPage('train')">
-        <svg viewBox="0 0 24 24"><path d="m15 4-2 4 4 2-2 4M2 20h20M6 20V9a3 3 0 0 1 3-3h1"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
         <span>Train</span>
       </button>
       <button class="nav-btn" id="navGuide" onclick="setPage('guide')">
-        <svg viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M8 7h8M8 11h6"/></svg>
         <span>Guide</span>
       </button>
       <button class="nav-btn" id="navSettings" onclick="setPage('settings')">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>Settings</span>
       </button>
     </div>
 
-    <!-- Status Inset Card -->
-    <div class="section-title">STATUS</div>
+    <div class="side-label">Status</div>
     <div class="inset-card">
       <div class="status-row">
         <span class="lbl">Model</span>
-        <span class="val" id="sideModel">Personal</span>
+        <span class="val" id="sideModel">Loading</span>
       </div>
       <div class="status-row">
         <span class="lbl">Camera</span>
-        <span class="val green" id="sideCamera">Live</span>
+        <span class="val" id="sideCamera">Connecting</span>
       </div>
       <div class="status-row">
         <span class="lbl">Speech</span>
@@ -1027,81 +1166,81 @@
       </div>
     </div>
 
-    <!-- Tip Inset Card -->
     <div class="tip-card">
       <h4>Personalize your signs</h4>
-      <p>Teach a personal model the handshapes you use most.</p>
-      <button class="tip-btn" onclick="setPage('train')">✨ Train a model</button>
+      <p>Teach the model the handshapes you use most.</p>
+      <button class="tip-btn" onclick="setPage('train')">
+        Train a model
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
     </div>
 
-    <!-- Footer -->
     <div class="sidebar-footer">
-      <span>● All processing stays on this device</span>
-      <span>v1.0 · MediaPipe + Web UI</span>
+      <span>Processing stays on this network</span>
+      <span>v1.0 · MediaPipe</span>
     </div>
   </aside>
 
   <!-- ==================================================================
-       WORKSPACE MAIN CONTENT AREA (QStackedWidget)
+       Workspace
        ================================================================== -->
   <main id="content">
 
-    <!-- PAGE 1: TRANSLATE PAGE (Exact match to TranslatePage) -->
+    <!-- PAGE 1: Translate -->
     <div class="page-view active" id="pageTranslate">
-      <!-- Header -->
       <div class="page-header">
         <div class="page-title-group">
           <h2>Live translate</h2>
           <p>Sign naturally. Your handshapes become text, ready to edit or speak.</p>
         </div>
         <div class="header-actions">
-          <div class="pill" tone="violet" id="headerModelPill">Personal model · 99.4%</div>
-          <div class="pill" tone="green" id="headerCameraPill">LIVE · 172.16.0.11</div>
+          <div class="pill" tone="violet" id="headerModelPill">Loading model</div>
+          <div class="pill" tone="amber" id="headerCameraPill">Connecting</div>
         </div>
       </div>
 
-      <!-- Content Grid: Left (Video) & Right (Recognition) -->
       <div class="translate-grid">
-        <!-- Left: Video Card -->
+        <!-- Left: video -->
         <div class="video-card">
           <div class="card">
             <div class="video-viewport" id="videoBox">
-              <img id="cameraStream" src="/video_feed" alt="Live Camera" onerror="if (this.getAttribute('src')) setTimeout(() => retryStream(true), 1500)">
+              <img id="cameraStream" src="/video_feed" alt="Live camera" onerror="if (this.getAttribute('src')) setTimeout(() => retryStream(true), 1500)">
             </div>
             <div class="video-controls">
-              <span class="pill" tone="green" id="liveStatusPill">LIVE</span>
-              <span class="fps-lbl" id="fpsLabel">29.5 FPS</span>
-              <button class="btn btn-ghost" id="retryBtn" style="display: none;" onclick="retryStream()">🔄 Retry camera</button>
-              <div style="flex: 1;"></div>
-              <button class="icon-btn active" id="mirrorBtn" title="Mirror the preview" onclick="toggleMirror()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h3m8-18h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3M12 2v20"/></svg>
+              <span class="pill" tone="amber" id="liveStatusPill">Connecting</span>
+              <span class="fps-lbl" id="fpsLabel">— FPS</span>
+              <button class="btn btn-ghost sm" id="retryBtn" style="display: none;" onclick="retryStream()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+                Retry camera
               </button>
-              <button class="icon-btn" id="pauseBtn" title="Pause camera" onclick="togglePause()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              <div class="spacer"></div>
+              <button class="icon-btn active" id="mirrorBtn" title="Mirror the preview" aria-label="Mirror the preview" onclick="toggleMirror()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h3m8-18h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3M12 2v20"/></svg>
               </button>
-              <select class="select-cam" id="cameraSelect" onchange="onCameraSelect(this.value)">
-                <option value="laptop" selected>💻 Laptop Webcam (0)</option>
-                <option value="ethernet">🔌 Direct Ethernet (192.168.128.10:554)</option>
-                <option value="5g" id="opt5g">📶 5G Modem (10.101.0.74:554)</option>
+              <button class="icon-btn" id="pauseBtn" title="Pause camera (Esc)" aria-label="Pause camera" onclick="togglePause()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+              </button>
+              <select class="select-cam" id="cameraSelect" aria-label="Camera" onchange="onCameraSelect(this.value)">
+                <option value="laptop" selected>Laptop webcam</option>
+                <option value="ethernet">Direct Ethernet (192.168.128.10:554)</option>
+                <option value="5g" id="opt5g">5G modem (10.101.0.74:554)</option>
               </select>
-              <div id="group5GIp" style="display: inline-flex; align-items: center; gap: 4px;">
-                <input type="text" id="quick5GIp" value="10.101.0.74" placeholder="10.101.0.74" title="Enter dynamic 5G Modem WAN IP" style="width: 108px; height: 32px; font-size: 12px; font-family: var(--font-mono); border: 1px solid var(--border); border-radius: 7px; padding: 0 7px; background: var(--surface); color: var(--text);" onkeydown="if(event.key==='Enter') applyQuick5GIp()">
-                <button class="btn btn-ghost" style="height: 32px; padding: 0 8px; font-size: 11.5px; white-space: nowrap;" onclick="applyQuick5GIp()" title="Connect to this 5G RTSP stream">Set 5G IP</button>
+              <div class="ip-group" id="group5GIp">
+                <input type="text" id="quick5GIp" value="10.101.0.74" placeholder="10.101.0.74" title="5G modem WAN IP" aria-label="5G modem IP" onkeydown="if(event.key==='Enter') applyQuick5GIp()">
+                <button class="btn btn-ghost" onclick="applyQuick5GIp()" title="Connect to this 5G RTSP stream">Set IP</button>
               </div>
             </div>
           </div>
           <div class="hint-row">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-            <span>Keep your hand in frame and change signs directly—no need to move out of view. Thumbs up finishes a word · Period sign finishes a sentence.</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>Keep your hand in frame and change signs directly — there's no need to move out of view. Thumbs up finishes a word; the period sign finishes a sentence.</span>
           </div>
         </div>
 
-        <!-- Right: Recognition Cards -->
+        <!-- Right: recognition -->
         <div class="right-column">
-          <!-- Card 1: Detected Sign (with SignDial) -->
           <div class="card detected-card">
             <div class="detect-inner">
-              <!-- Circular SignDial -->
               <div class="dial-wrap">
                 <svg class="dial-svg" viewBox="0 0 200 200">
                   <circle class="dial-track" cx="100" cy="100" r="88"/>
@@ -1109,18 +1248,17 @@
                 </svg>
                 <div class="dial-disc" id="dialDisc">
                   <span class="dial-char" id="dialChar">—</span>
-                  <span class="dial-caption" id="dialCaption">SHOW YOUR HAND</span>
+                  <span class="dial-caption" id="dialCaption">Show your hand</span>
                 </div>
               </div>
 
-              <!-- Detected Sign Details -->
               <div class="detect-info">
-                <div class="section-title">DETECTED SIGN</div>
+                <div class="eyebrow">Detected sign</div>
                 <h3 id="detectTitle">Starting camera…</h3>
                 <p id="detectHint">Center your hand in the frame.</p>
                 <div class="conf-row">
-                  <span style="color: var(--muted); font-size: 11.5px;">Model signal</span>
-                  <span style="color: var(--accent); font-weight: 700; font-family: var(--font-mono);" id="confPct">—</span>
+                  <span>Model signal</span>
+                  <span class="conf-value" id="confPct">—</span>
                 </div>
                 <div class="conf-bar-bg">
                   <div class="conf-bar-fill" id="confBar"></div>
@@ -1129,53 +1267,49 @@
             </div>
           </div>
 
-          <!-- Card 2: Current Word -->
           <div class="card word-card">
             <div class="card-header-row">
-              <span class="section-title">CURRENT WORD</span>
-              <span style="font-size: 11.5px; color: var(--muted);" id="letterCount">0 letters</span>
+              <span class="section-title">Current word</span>
+              <span class="card-meta" id="letterCount">0 letters</span>
             </div>
             <div class="word-field" id="wordField"></div>
             <div class="card-header-row">
               <div class="btn-group">
-                <button class="btn btn-ghost" onclick="sendAction('backspace')">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+                <button class="btn btn-ghost sm" onclick="sendAction('backspace')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><path d="m18 9-6 6M12 9l6 6"/></svg>
                   <span>Backspace</span>
                 </button>
-                <button class="btn btn-ghost" onclick="sendAction('space')">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                <button class="btn btn-ghost sm" onclick="sendAction('space')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
                   <span>Finish word</span>
                 </button>
-                <button class="btn btn-ghost" onclick="sendAction('clear_word')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <button class="btn btn-ghost sm" onclick="sendAction('clear_word')">
                   <span>Clear</span>
                 </button>
               </div>
-              <button class="btn btn-primary" onclick="sendAction('commit_now')" title="Type the sign you are currently holding (Enter)">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M18 12h.01M8 16h8"/></svg>
+              <button class="btn btn-primary sm" onclick="sendAction('commit_now')" title="Type the sign you are currently holding (Enter)">
                 <span>Type sign</span>
               </button>
             </div>
           </div>
 
-          <!-- Card 3: Transcript -->
           <div class="card transcript-card">
             <div class="card-header-row">
-              <span class="section-title">TRANSCRIPT</span>
+              <span class="section-title">Transcript</span>
               <div class="btn-group">
-                <button class="btn btn-ghost" style="padding: 4px 8px; font-size: 11.5px;" onclick="sendAction('delete_word')">Delete word</button>
-                <button class="icon-btn" style="width: 30px; height: 30px;" title="Copy transcript" onclick="copyTranscript()">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <button class="btn btn-ghost sm" onclick="sendAction('delete_word')">Delete word</button>
+                <button class="icon-btn sm" title="Copy transcript" aria-label="Copy transcript" onclick="copyTranscript()">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 </button>
-                <button class="icon-btn" style="width: 30px; height: 30px;" title="Clear transcript (Ctrl+R)" onclick="sendAction('clear_all')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <button class="icon-btn sm" title="Clear transcript (Ctrl+R)" aria-label="Clear transcript" onclick="sendAction('clear_all')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 </button>
               </div>
             </div>
             <div class="transcript-area" id="transcriptArea"></div>
             <div class="footer-row">
               <button class="btn btn-primary" onclick="speakCurrentSentence()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
                 <span>Speak sentence</span>
               </button>
               <div class="btn-group">
@@ -1185,16 +1319,18 @@
             </div>
           </div>
 
-          <!-- Shortcuts Row -->
           <div class="shortcut-hint">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M18 12h.01M8 16h8"/></svg>
-            <span>Enter · type sign &nbsp;&nbsp; Backspace · undo &nbsp;&nbsp; Ctrl+Backspace · delete word &nbsp;&nbsp; Esc · pause &nbsp;&nbsp; Ctrl+R · reset</span>
+            <span><kbd>Enter</kbd> type sign</span>
+            <span><kbd>Backspace</kbd> undo</span>
+            <span><kbd>Ctrl</kbd><kbd>Backspace</kbd> delete word</span>
+            <span><kbd>Esc</kbd> pause</span>
+            <span><kbd>Ctrl</kbd><kbd>R</kbd> reset</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- PAGE 2: TRAIN PAGE (Matching TrainPage) -->
+    <!-- PAGE 2: Train -->
     <div class="page-view" id="pageTrain">
       <div class="page-header">
         <div class="page-title-group">
@@ -1202,200 +1338,160 @@
           <p>Build a recognizer around your hands. Record separate takes with small changes in position and distance.</p>
         </div>
         <div class="header-actions">
-          <span class="pill" id="trainHeaderPill" tone="green">PERSONAL MODEL</span>
-          <button class="btn btn-primary" id="btnTrainHeader" onclick="requestTraining()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 4V2m0 16v-2m8-8h-2M4 10H2m17.07-5.07l-1.41 1.41M6.34 17.66l-1.41 1.41m14.14 0l-1.41-1.41M6.34 6.34L4.93 4.93M14 10a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-            Train model
-          </button>
+          <span class="pill" id="trainHeaderPill" tone="green">Personal model</span>
+          <button class="btn btn-primary" id="btnTrainHeader" onclick="requestTraining()">Train model</button>
         </div>
       </div>
 
-      <!-- Top Row: Preview + Record Card -->
       <div class="train-top-row">
-        <!-- Preview Card -->
-        <div class="card video-card" style="padding: 16px; gap: 10px;">
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <span class="section-title">CAMERA PREVIEW</span>
-            <span class="pill" id="trainPreviewPill" tone="green">LIVE</span>
+        <!-- Preview -->
+        <div class="card video-card card-pad">
+          <div class="card-header-row">
+            <span class="section-title">Camera preview</span>
+            <span class="pill" id="trainPreviewPill" tone="amber">Connecting</span>
           </div>
-          <div class="video-viewport" style="border-radius: 9px; min-height: 240px;">
-            <img id="trainCameraStream" alt="Train Preview Stream" onerror="if (!this.getAttribute('src')) return; this.style.display='none'; document.getElementById('trainStreamFallback').style.display='flex';" onload="this.style.display='block'; document.getElementById('trainStreamFallback').style.display='none';">
-            <div id="trainStreamFallback" style="display: none; flex-direction: column; align-items: center; justify-content: center; color: var(--faint); gap: 6px;">
-              <span style="font-size: 14px; font-weight: 600;">Camera offline</span>
-              <span style="font-size: 11px;">Check camera connection in Settings</span>
+          <div class="video-viewport preview-viewport">
+            <img id="trainCameraStream" alt="Training preview" onerror="if (!this.getAttribute('src')) return; this.style.display='none'; document.getElementById('trainStreamFallback').style.display='flex';" onload="this.style.display='block'; document.getElementById('trainStreamFallback').style.display='none';">
+            <div id="trainStreamFallback" class="stream-fallback">
+              <strong>Camera offline</strong>
+              <span>Check the camera connection in Settings</span>
             </div>
           </div>
           <div class="hint-row" style="margin-top: 0;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
             <span>Keep both hands visible for two-hand signs. Use even light, and vary hand position slightly between takes.</span>
           </div>
         </div>
 
-        <!-- Record a Sign Card -->
-        <div class="card" style="padding: 18px; gap: 12px;">
-          <span class="section-title">RECORD A SIGN</span>
+        <!-- Record a sign -->
+        <div class="card card-pad">
+          <span class="section-title">Record a sign</span>
 
-          <!-- Selected sign banner -->
-          <div style="display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: var(--inset); border-radius: 9px; border: 1px solid var(--border);">
-            <div id="selectedTrainLabelBig" style="font-size: 44px; font-weight: 800; color: var(--accent); line-height: 1; min-width: 50px; text-align: center;">A</div>
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-              <div id="selectedTrainName" style="font-size: 17px; font-weight: 700; color: var(--text);">Sign A</div>
-              <div id="selectedTrainCounts" style="font-size: 11.5px; color: var(--muted); font-family: var(--font-mono);">0 samples · 0 takes · target 30</div>
+          <div class="selected-sign">
+            <div id="selectedTrainLabelBig">A</div>
+            <div class="selected-sign-meta">
+              <div id="selectedTrainName">Sign A</div>
+              <div id="selectedTrainCounts">0 samples · 0 takes · target 30</div>
             </div>
           </div>
 
-          <!-- Sign hint -->
-          <div id="selectedTrainHint" style="font-size: 12px; color: var(--muted); line-height: 1.4; min-height: 34px;">
-            Fist with thumb resting along the side of index finger
-          </div>
+          <div id="selectedTrainHint">Closed fist, thumb resting beside the index finger.</div>
 
-          <!-- Capture Length & Delay controls -->
-          <div style="display: flex; gap: 10px;">
-            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-              <span style="font-size: 11px; font-weight: 600; color: var(--muted);">Capture length</span>
+          <div class="field-pair">
+            <label class="field">
+              <span class="field-label">Capture length</span>
               <select id="trainDurationSelect">
-                <option value="2.0">2 sec</option>
-                <option value="3.0" selected>3 sec</option>
-                <option value="4.0">4 sec</option>
+                <option value="2.0">2 seconds</option>
+                <option value="3.0" selected>3 seconds</option>
+                <option value="4.0">4 seconds</option>
               </select>
-            </div>
-            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-              <span style="font-size: 11px; font-weight: 600; color: var(--muted);">Start delay</span>
+            </label>
+            <label class="field">
+              <span class="field-label">Start delay</span>
               <select id="trainDelaySelect">
-                <option value="0.0">Off</option>
-                <option value="2.0">2 sec</option>
-                <option value="3.0" selected>3 sec</option>
-                <option value="5.0">5 sec</option>
-                <option value="8.0">8 sec</option>
+                <option value="0.0">None</option>
+                <option value="2.0">2 seconds</option>
+                <option value="3.0" selected>3 seconds</option>
+                <option value="5.0">5 seconds</option>
+                <option value="8.0">8 seconds</option>
               </select>
-            </div>
+            </label>
           </div>
 
-          <!-- Record / Cancel buttons -->
-          <div style="display: flex; gap: 8px; margin-top: 2px;">
-            <button class="btn btn-primary" id="btnRecordSign" style="flex: 1; min-height: 40px;" onclick="startSignRecording()">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+          <div class="row">
+            <button class="btn btn-primary lg block" id="btnRecordSign" onclick="startSignRecording()">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
               <span id="btnRecordSignText">Record sign</span>
             </button>
-            <button class="btn btn-ghost" id="btnCancelRecord" style="display: none; min-height: 40px;" onclick="cancelSignRecording()">
-              Cancel
-            </button>
+            <button class="btn btn-ghost lg" id="btnCancelRecord" style="display: none;" onclick="cancelSignRecording()">Cancel</button>
           </div>
 
-          <!-- Progress Bar -->
           <div id="recordProgressWrap" style="display: none; flex-direction: column; gap: 4px;">
             <div class="progress-bar-container">
               <div class="progress-bar-fill" id="recordProgressBar" style="width: 0%;"></div>
             </div>
           </div>
 
-          <!-- Status text -->
-          <div id="recordStatusText" style="font-size: 11.5px; color: var(--muted); line-height: 1.4;">
+          <div id="recordStatusText" class="muted-text">
             Record multiple separate takes for each sign. Vary position between takes.
           </div>
 
-          <!-- Clear / Remove buttons -->
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 6px; border-top: 1px solid var(--border);">
-            <button class="btn btn-ghost" style="font-size: 11.5px; padding: 6px 10px;" onclick="clearCurrentSign()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              Clear this sign
-            </button>
-            <button class="btn btn-danger" id="btnRemoveWord" style="display: none; font-size: 11.5px; padding: 6px 10px;" onclick="removeCurrentCustomWord()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              Remove custom word
-            </button>
+          <div class="card-actions-footer">
+            <button class="btn btn-ghost sm" onclick="clearCurrentSign()">Clear this sign</button>
+            <button class="btn btn-ghost btn-danger sm" id="btnRemoveWord" style="display: none;" onclick="removeCurrentCustomWord()">Remove custom word</button>
           </div>
         </div>
       </div>
 
-      <!-- Dataset Card -->
-      <div class="card" style="padding: 18px; gap: 14px;">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span class="section-title">YOUR DATASET</span>
-            <span id="datasetSummaryCount" style="font-size: 12px; color: var(--muted); font-family: var(--font-mono);">0 samples · 0 signs</span>
+      <!-- Dataset -->
+      <div class="card card-pad">
+        <div class="card-header-row">
+          <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
+            <span class="section-title">Your dataset</span>
+            <span id="datasetSummaryCount" class="card-meta">0 samples · 0 signs</span>
           </div>
-          <button class="btn btn-danger" style="font-size: 12px; padding: 6px 12px;" onclick="confirmClearDataset()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            Clear all data
-          </button>
+          <button class="btn btn-ghost btn-danger sm" onclick="confirmClearDataset()">Clear all data</button>
         </div>
 
-        <!-- Custom word row -->
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="customWordInput" placeholder="Add a custom word or short phrase" maxlength="32" style="flex: 1;" onkeydown="if(event.key==='Enter') addCustomWordFromInput()">
-          <button class="btn btn-ghost" id="btnVoiceCustomWord" onclick="toggleVoiceForCustomWord()">
-            🎤 Record phrase
-          </button>
+        <div class="row">
+          <input type="text" id="customWordInput" placeholder="Add a custom word or short phrase" maxlength="32" onkeydown="if(event.key==='Enter') addCustomWordFromInput()">
+          <button class="btn btn-ghost" id="btnVoiceCustomWord" onclick="toggleVoiceForCustomWord()">Record phrase</button>
           <button class="btn btn-ghost" onclick="addCustomWordFromInput()">Add word</button>
         </div>
 
-        <!-- Letters Grid (13 columns) -->
-        <div class="train-grid-container" id="tilesGrid">
-          <!-- Dynamically populated -->
-        </div>
+        <div class="train-grid-container" id="tilesGrid"></div>
 
-        <div style="font-size: 11.5px; color: var(--faint);">
-          Aim for 30+ samples from at least 3 separate takes per sign.
-        </div>
+        <div class="faint-text">Aim for 30+ samples from at least 3 separate takes per sign.</div>
       </div>
 
-      <!-- Bottom Row: Train Model & Model in Use -->
       <div class="train-bottom-row">
-        <!-- Train Model Card -->
-        <div class="card" style="padding: 18px; gap: 12px;">
-          <span class="section-title">TRAIN MODEL</span>
-          <p style="font-size: 12px; color: var(--muted); line-height: 1.5;">
-            SignSpeak compares SVM, Extra Trees, Random Forest and K-NN. With multiple takes per sign, it validates on held-out takes before saving the best model.
+        <!-- Train model -->
+        <div class="card card-pad">
+          <span class="section-title">Train model</span>
+          <p class="muted-text">
+            SignSpeak compares SVM, Extra Trees, Random Forest and k-NN. With multiple takes per sign, it validates on held-out takes before saving the best model.
           </p>
-          <button class="btn btn-primary" id="btnTrainPersonal" style="min-height: 40px; font-weight: 600;" onclick="requestTraining()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 4V2m0 16v-2m8-8h-2M4 10H2m17.07-5.07l-1.41 1.41M6.34 17.66l-1.41 1.41m14.14 0l-1.41-1.41M6.34 6.34L4.93 4.93M14 10a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-            Train personal model
-          </button>
+          <button class="btn btn-primary lg" id="btnTrainPersonal" onclick="requestTraining()">Train personal model</button>
           <div id="trainProgressWrap" style="display: none; flex-direction: column; gap: 4px;">
             <div class="progress-bar-container">
               <div class="progress-bar-fill" id="trainProgressBar" style="width: 0%;"></div>
             </div>
           </div>
-          <div id="trainStatusText" style="font-size: 12px; color: var(--muted); line-height: 1.4;">
+          <div id="trainStatusText" class="muted-text">
             Record at least two signs (5+ samples each) to start training.
           </div>
         </div>
 
-        <!-- Model in Use Card -->
-        <div class="card" style="padding: 18px; gap: 12px;">
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <span class="section-title">MODEL IN USE</span>
-            <span class="pill" id="cardModelPill" tone="green">PERSONAL</span>
+        <!-- Model in use -->
+        <div class="card card-pad">
+          <div class="card-header-row">
+            <span class="section-title">Model in use</span>
+            <span class="pill" id="cardModelPill" tone="green">Active</span>
           </div>
-          <div id="cardModelName" style="font-size: 18px; font-weight: 700; color: var(--text);">Your personal model</div>
-          <div id="cardModelDetail" style="font-size: 12px; color: var(--muted);">Personal sign recognition</div>
-          <div id="cardModelAccuracy" style="font-size: 22px; font-weight: 800; color: var(--green);">Loading model status…</div>
-
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-primary" id="btnPersonalModelActive" style="flex: 1;" disabled>
-              Personal model active
-            </button>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div id="cardModelName">Loading model…</div>
+            <div id="cardModelDetail">Sign recognition model</div>
+            <div id="cardModelAccuracy"></div>
           </div>
 
-          <div style="display: flex; gap: 8px;">
-            <a href="/api/model/download" class="btn btn-ghost" style="flex: 1; text-decoration: none; font-size: 12px;">
-              Save a copy…
-            </a>
-            <button class="btn btn-ghost" style="flex: 1; font-size: 12px;" onclick="document.getElementById('modelFileInput').click()">
-              Load saved model…
-            </button>
+          <div class="row">
+            <button class="btn btn-primary block" id="btnPersonalModelActive" disabled>Model active</button>
+          </div>
+
+          <div class="row">
+            <a href="/api/model/download" class="btn btn-ghost block" style="text-decoration: none;">Save a copy…</a>
+            <button class="btn btn-ghost block" onclick="document.getElementById('modelFileInput').click()">Load saved model…</button>
             <input type="file" id="modelFileInput" accept=".joblib,.pkl" style="display: none;" onchange="uploadModelFile(this)">
           </div>
 
-          <div style="font-size: 11.5px; color: var(--faint); line-height: 1.4;">
-            Personal models adapt to the examples you record. Keep a saved copy before retraining if you want to return to an earlier version.
+          <div class="faint-text">
+            Personal models adapt to the examples you record. Save a copy before retraining if you want to return to an earlier version.
           </div>
         </div>
       </div>
     </div>
 
-    <!-- PAGE 3: GUIDE PAGE (Matching GuidePage with ASL Chart) -->
+    <!-- PAGE 3: Guide -->
     <div class="page-view" id="pageGuide">
       <div class="page-header">
         <div class="page-title-group">
@@ -1406,12 +1502,12 @@
 
       <div class="card guide-card">
         <div class="guide-image-wrap">
-          <img src="/assets/asl_alphabet.png" alt="ASL Alphabet Reference" onerror="this.alt='ASL Alphabet Chart Image';">
+          <img src="/assets/asl_alphabet.png" alt="ASL alphabet reference chart" onerror="this.alt='ASL alphabet chart';">
         </div>
       </div>
     </div>
 
-    <!-- PAGE 4: SETTINGS PAGE (Matching SettingsPage) -->
+    <!-- PAGE 4: Settings -->
     <div class="page-view" id="pageSettings">
       <div class="page-header">
         <div class="page-title-group">
@@ -1419,217 +1515,216 @@
           <p>Set up your camera, recognition pace and speech preferences.</p>
         </div>
         <div class="header-actions">
-          <button class="btn btn-ghost" onclick="resetDefaultSettings()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            Reset defaults
-          </button>
+          <button class="btn btn-ghost" onclick="resetDefaultSettings()">Reset defaults</button>
           <button class="btn btn-primary" onclick="saveSettings()">Save changes</button>
         </div>
       </div>
 
       <div class="settings-grid">
-        <!-- 1. Camera Settings -->
+        <!-- Camera -->
         <div class="card setting-group">
-          <span class="section-title">CAMERA MODES (3 OPTIONS)</span>
-          <div class="setting-row">
-            <span class="setting-lbl">Active Camera Mode:</span>
+          <span class="section-title">Camera</span>
+          <label class="setting-row">
+            <span class="setting-lbl">Camera source</span>
             <select id="cfgCamMode" onchange="onSettingCamModeChange(this.value)">
-              <option value="laptop">💻 Mode 1: Laptop Webcam (0)</option>
-              <option value="ethernet">🔌 Mode 2: Direct Ethernet (192.168.128.10:554)</option>
-              <option value="5g">📶 Mode 3: 5G Modem Camera (Dynamic IP)</option>
+              <option value="laptop">Laptop webcam</option>
+              <option value="ethernet">Direct Ethernet (192.168.128.10:554)</option>
+              <option value="5g">5G modem camera (dynamic IP)</option>
             </select>
-          </div>
+          </label>
           <div class="setting-row" id="row5GIp">
-            <span class="setting-lbl">5G Camera IP Address (Dynamic WAN):</span>
+            <label class="setting-lbl" for="cfg5GIp">5G camera IP address</label>
             <input type="text" id="cfg5GIp" placeholder="10.101.0.74" style="font-family: var(--font-mono);">
-            <span class="setting-sub">Modem assigns dynamic WAN IP on reconnect (currently 10.101.0.74). Automatically updates .env.</span>
+            <span class="setting-sub">The modem gets a new WAN IP each time it reconnects. Saving updates CAMERA_HOST in .env.</span>
           </div>
-          <div class="setting-row">
-            <span class="setting-lbl">Inference Width:</span>
-            <span class="setting-sub">640 px balances speed and detail. 800–960 px for smaller hands.</span>
+          <label class="setting-row">
+            <span class="setting-lbl">Inference width</span>
             <select id="cfgInferenceWidth">
-              <option value="480">480 px (Fastest)</option>
-              <option value="640">640 px (Balanced)</option>
-              <option value="800" selected>800 px (Recommended for Edge)</option>
-              <option value="960">960 px (High Detail)</option>
+              <option value="480">480 px — fastest</option>
+              <option value="640">640 px — balanced</option>
+              <option value="800" selected>800 px — recommended</option>
+              <option value="960">960 px — most detail</option>
             </select>
-          </div>
+            <span class="setting-sub">640 px balances speed and detail; use 800–960 px for smaller hands.</span>
+          </label>
           <div class="setting-row">
-            <span class="setting-lbl">Mirror Preview:</span>
-            <span class="setting-sub">Flip the camera display horizontally so signs feel natural.</span>
-            <label style="display: flex; align-items: center; gap: 8px; margin-top: 4px; cursor: pointer;">
+            <label class="check-row">
               <input type="checkbox" id="cfgMirror" checked>
-              <span style="font-size: 13px;">Enable mirror preview</span>
+              <span>Mirror the preview</span>
             </label>
+            <span class="setting-sub" style="padding-left: 26px;">Flip the camera display horizontally so signs feel natural.</span>
           </div>
           <div class="inset-card">
-            <span class="section-title">3 CAMERA MODES REFERENCE</span>
+            <span class="subgroup-title">Camera addresses</span>
             <div class="status-row">
-              <span>Mode 1 (Laptop Webcam):</span>
-              <span class="val">Device Index 0 (Local USB/Built-in)</span>
+              <span>Laptop webcam</span>
+              <span class="val">Device 0</span>
             </div>
             <div class="status-row">
-              <span>Mode 2 (Direct Ethernet):</span>
-              <span class="val"><a href="http://192.168.128.10:8080" target="_blank" style="color: var(--accent); text-decoration: none;">192.168.128.10:8080 (Web Login)</a></span>
+              <span>Camera web login</span>
+              <span class="val"><a href="http://192.168.128.10:8080" target="_blank" rel="noopener">192.168.128.10:8080</a></span>
             </div>
             <div class="status-row">
-              <span>Mode 3 (5G Modem WAN):</span>
-              <span class="val" id="lbl5GHostQuick">10.101.0.73 (Dynamic RTSP :554)</span>
+              <span>5G modem (RTSP)</span>
+              <span class="val" id="lbl5GHostQuick">10.101.0.74 (Dynamic RTSP :554)</span>
             </div>
             <div class="status-row">
-              <span>Modem Direct Ethernet IP:</span>
-              <span class="val"><a href="http://192.168.128.1" target="_blank" style="color: var(--accent); text-decoration: none;">192.168.128.1</a></span>
+              <span>Modem admin page</span>
+              <span class="val"><a href="http://192.168.128.1" target="_blank" rel="noopener">192.168.128.1</a></span>
             </div>
           </div>
         </div>
 
-        <!-- 2. Recognition Pace -->
+        <!-- Recognition -->
         <div class="card setting-group">
-          <span class="section-title">RECOGNITION</span>
+          <span class="section-title">Recognition</span>
           <div class="setting-row">
             <div class="setting-row-h">
-              <span class="setting-lbl">Hold to type:</span>
-              <span class="val" id="valHold" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">500 ms</span>
+              <label class="setting-lbl" for="cfgHold">Hold to type</label>
+              <span class="setting-val" id="valHold">500 ms</span>
             </div>
             <input type="range" id="cfgHold" min="150" max="2000" step="50" value="500" oninput="document.getElementById('valHold').textContent = this.value + ' ms'">
             <span class="setting-sub">How long a sign must stay stable before it is typed.</span>
           </div>
           <div class="setting-row">
             <div class="setting-row-h">
-              <span class="setting-lbl">Smoothing window:</span>
-              <span class="val" id="valSmoothing" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">8 frames</span>
+              <label class="setting-lbl" for="cfgSmoothing">Smoothing window</label>
+              <span class="setting-val" id="valSmoothing">8 frames</span>
             </div>
             <input type="range" id="cfgSmoothing" min="4" max="30" step="1" value="8" oninput="document.getElementById('valSmoothing').textContent = this.value + ' frames'">
-            <span class="setting-sub">More frames = steadier but slightly slower.</span>
+            <span class="setting-sub">More frames are steadier but slightly slower.</span>
           </div>
           <div class="setting-row">
             <div class="setting-row-h">
-              <span class="setting-lbl">Vote agreement:</span>
-              <span class="val" id="valVoteRatio" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">60%</span>
+              <label class="setting-lbl" for="cfgVoteRatio">Vote agreement</label>
+              <span class="setting-val" id="valVoteRatio">60%</span>
             </div>
             <input type="range" id="cfgVoteRatio" min="35" max="90" step="5" value="60" oninput="document.getElementById('valVoteRatio').textContent = this.value + '%'">
             <span class="setting-sub">Share of recent frames that must agree.</span>
           </div>
           <div class="setting-row">
             <div class="setting-row-h">
-              <span class="setting-lbl">Confidence cutoff:</span>
-              <span class="val" id="valConf" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">0.55</span>
+              <label class="setting-lbl" for="cfgConf">Confidence cutoff</label>
+              <span class="setting-val" id="valConf">0.55</span>
             </div>
             <input type="range" id="cfgConf" min="0.20" max="0.90" step="0.05" value="0.55" oninput="document.getElementById('valConf').textContent = this.value">
-            <span class="setting-sub">Signal confidence required to recognize hand shape.</span>
+            <span class="setting-sub">Signal confidence required to recognize a handshape.</span>
           </div>
         </div>
 
-        <!-- 3. Speech & Audio (Sarvam AI & Indian Languages) -->
+        <!-- Speech -->
         <div class="card setting-group">
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <span class="section-title">SPEECH & AUDIO</span>
-            <span class="pill" id="sarvamKeyPill" tone="green">SARVAM ACTIVE</span>
+          <div class="card-header-row">
+            <span class="section-title">Speech</span>
+            <span class="pill" id="sarvamKeyPill" tone="green">Sarvam</span>
           </div>
-          <div class="setting-row">
-            <span class="setting-lbl">Speech Engine Provider:</span>
+          <label class="setting-row">
+            <span class="setting-lbl">Speech engine</span>
             <select id="cfgTTSProvider" onchange="onTTSProviderChange()">
-              <option value="sarvam" selected>Auto: English → Microsoft, Indian languages → Sarvam</option>
+              <option value="sarvam" selected>Automatic — Microsoft for English, Sarvam for Indian languages</option>
               <option value="local">Microsoft voice only</option>
             </select>
-          </div>
-          <div class="setting-row" id="rowSarvamLang">
-            <span class="setting-lbl">Speech Language:</span>
+          </label>
+          <label class="setting-row" id="rowSarvamLang">
+            <span class="setting-lbl">Speech language</span>
             <select id="cfgSarvamLang" onchange="onSarvamLangChange()">
-              <option value="en-IN" selected>English · Microsoft voice</option>
-              <option value="hi-IN">Hindi (hi-IN) · Sarvam</option>
-              <option value="bn-IN">Bengali (bn-IN) · Sarvam</option>
-              <option value="gu-IN">Gujarati (gu-IN) · Sarvam</option>
-              <option value="kn-IN">Kannada (kn-IN) · Sarvam</option>
-              <option value="ml-IN">Malayalam (ml-IN) · Sarvam</option>
-              <option value="mr-IN">Marathi (mr-IN) · Sarvam</option>
-              <option value="od-IN">Odia (od-IN) · Sarvam</option>
-              <option value="pa-IN">Punjabi (pa-IN) · Sarvam</option>
-              <option value="ta-IN">Tamil (ta-IN) · Sarvam</option>
-              <option value="te-IN">Telugu (te-IN) · Sarvam</option>
+              <option value="en-IN" selected>English — Microsoft voice</option>
+              <option value="hi-IN">Hindi — Sarvam</option>
+              <option value="bn-IN">Bengali — Sarvam</option>
+              <option value="gu-IN">Gujarati — Sarvam</option>
+              <option value="kn-IN">Kannada — Sarvam</option>
+              <option value="ml-IN">Malayalam — Sarvam</option>
+              <option value="mr-IN">Marathi — Sarvam</option>
+              <option value="od-IN">Odia — Sarvam</option>
+              <option value="pa-IN">Punjabi — Sarvam</option>
+              <option value="ta-IN">Tamil — Sarvam</option>
+              <option value="te-IN">Telugu — Sarvam</option>
             </select>
-          </div>
-          <div class="setting-row" id="rowLocalVoice">
-            <span class="setting-lbl">English (Microsoft) Voice:</span>
+          </label>
+          <label class="setting-row" id="rowLocalVoice">
+            <span class="setting-lbl">English voice</span>
             <select id="voiceDropdown" onchange="changeVoice()"></select>
-          </div>
+          </label>
           <div class="setting-row">
             <div class="setting-row-h">
-              <span class="setting-lbl">Speaking rate:</span>
-              <span class="val" id="valRate" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">Normal</span>
+              <label class="setting-lbl" for="cfgRate">Speaking rate</label>
+              <span class="setting-val" id="valRate">Normal</span>
             </div>
             <input type="range" id="cfgRate" min="-10" max="10" step="1" value="0" oninput="updateRateLabel(this.value)">
           </div>
           <div class="setting-row">
             <div class="setting-row-h">
-              <span class="setting-lbl">Volume:</span>
-              <span class="val" id="valVolume" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">100%</span>
+              <label class="setting-lbl" for="cfgVolume">Volume</label>
+              <span class="setting-val" id="valVolume">100%</span>
             </div>
             <input type="range" id="cfgVolume" min="0" max="100" step="5" value="100" oninput="document.getElementById('valVolume').textContent = this.value + '%'">
           </div>
-          <div style="display: flex; gap: 8px; margin-top: 4px;">
-            <button class="btn btn-ghost" onclick="testVoice()">🔊 Test voice</button>
+          <div>
+            <button class="btn btn-ghost" onclick="testVoice()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+              Test voice
+            </button>
           </div>
-          <div class="inset-card" style="margin-top: 6px;">
-            <span class="section-title">SPEECH AUTOMATION</span>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <div class="inset-card">
+            <span class="subgroup-title">Speak automatically</span>
+            <label class="check-row">
               <input type="checkbox" id="cfgAutoWord" checked>
-              <span style="font-size: 12.5px;">Speak words (when finishing with space sign)</span>
+              <span>Words, when finished with the space sign</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <label class="check-row">
               <input type="checkbox" id="cfgAutoSentence" checked>
-              <span style="font-size: 12.5px;">Speak sentences (when ending with full stop)</span>
+              <span>Sentences, when ended with a full stop</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <label class="check-row">
               <input type="checkbox" id="cfgSpeakLetters">
-              <span style="font-size: 12.5px;">Speak letters (pronounce each letter as typed)</span>
+              <span>Each letter as it is typed</span>
             </label>
           </div>
         </div>
 
-        <!-- 4. Advanced Timing & Display -->
+        <!-- Advanced -->
         <div class="card setting-group">
-          <span class="section-title">ADVANCED & DISPLAY</span>
+          <span class="section-title">Advanced and display</span>
           <div class="setting-row">
             <div class="setting-row-h">
-              <span class="setting-lbl">Minimum gap (Cooldown):</span>
-              <span class="val" id="valCooldown" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">200 ms</span>
+              <label class="setting-lbl" for="cfgCooldown">Minimum gap between signs</label>
+              <span class="setting-val" id="valCooldown">200 ms</span>
             </div>
             <input type="range" id="cfgCooldown" min="100" max="2000" step="50" value="200" oninput="document.getElementById('valCooldown').textContent = this.value + ' ms'">
             <span class="setting-sub">Safety delay between two typed signs.</span>
           </div>
           <div class="setting-row">
             <div class="setting-row-h">
-              <span class="setting-lbl">Release time:</span>
-              <span class="val" id="valRelease" style="font-family: var(--font-mono); color: var(--accent); font-weight: 700;">250 ms</span>
+              <label class="setting-lbl" for="cfgRelease">Release time</label>
+              <span class="setting-val" id="valRelease">250 ms</span>
             </div>
             <input type="range" id="cfgRelease" min="100" max="1000" step="50" value="250" oninput="document.getElementById('valRelease').textContent = this.value + ' ms'">
-            <span class="setting-sub">Time without a stable sign before it can repeat.</span>
+            <span class="setting-sub">Time without a stable sign before the same sign can repeat.</span>
           </div>
-          <div class="inset-card" style="margin-top: 6px;">
-            <span class="section-title">DISPLAY OVERLAYS</span>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <div class="inset-card">
+            <span class="subgroup-title">Video overlay</span>
+            <label class="check-row">
               <input type="checkbox" id="cfgDrawOverlay" checked>
-              <span style="font-size: 12.5px;">Draw hand skeleton & HUD overlay</span>
+              <span>Draw the hand skeleton and labels</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <label class="check-row">
               <input type="checkbox" id="cfgShowFps" checked>
-              <span style="font-size: 12.5px;">Show live FPS counter</span>
+              <span>Show the FPS counter</span>
             </label>
           </div>
-          <div class="inset-card" style="margin-top: 6px;">
-            <span class="section-title">SARVAM INTEGRATION STATUS</span>
+          <div class="inset-card">
+            <span class="subgroup-title">Sarvam services</span>
             <div class="status-row">
-              <span>Text-to-Speech:</span>
-              <span class="val green">Sarvam Bulbul v3</span>
+              <span>Text to speech</span>
+              <span class="val">Bulbul v3</span>
             </div>
             <div class="status-row">
-              <span>Speech-to-Text:</span>
-              <span class="val green">Sarvam Saaras v3</span>
+              <span>Speech to text</span>
+              <span class="val">Saaras v3</span>
             </div>
             <div class="status-row">
-              <span>API Key:</span>
-              <span class="val green">sk_5on72... (Active)</span>
+              <span>API key</span>
+              <span class="val mono">SARVAM_API_KEY in .env</span>
             </div>
           </div>
         </div>
@@ -1638,14 +1733,10 @@
 
   </main>
 
-  <!-- Toast -->
-  <div class="toast-box" id="toast">
+  <div class="toast-box" id="toast" role="status" aria-live="polite">
     <span id="toastMsg">Action completed</span>
   </div>
 
-  <!-- ==================================================================
-       SCRIPTS: Live State, Web Speech Synthesis, Keyboard Shortcuts
-       ================================================================== -->
   <script>
     // Tab switching
     function setPage(pageId) {
@@ -2076,12 +2167,7 @@
           body: JSON.stringify({ action, param })
         });
         const data = await res.json();
-        if (data.result && data.result.speak_word) {
-          speakText(data.result.speak_word);
-        }
-        else if (data.result && data.result.speak_sentence) {
-          speakText(data.result.speak_sentence);
-        }
+        speakCommitResult(data.result);
       } catch (err) {
         console.error(err);
       }
@@ -2138,7 +2224,7 @@
         const data = await res.json();
         if (data.status === 'ok') {
           const opt = document.getElementById('opt5g');
-          if (opt) opt.textContent = '📶 5G Modem (' + ip + ':554)';
+          if (opt) opt.textContent = '5G modem (' + ip + ':554)';
           const camSel = document.getElementById('cameraSelect');
           if (camSel) camSel.value = '5g';
           showToast('5G RTSP Camera set to ' + ip);
@@ -2258,7 +2344,7 @@
           if (data.host_5g) {
             current5GHost = data.host_5g;
             const opt = document.getElementById('opt5g');
-            if (opt) opt.textContent = '📶 5G Modem (' + current5GHost + ':554)';
+            if (opt) opt.textContent = '5G modem (' + current5GHost + ':554)';
             const quick = document.getElementById('lbl5GHostQuick');
             if (quick) quick.textContent = current5GHost + ' (Dynamic RTSP :554)';
             const inp = document.getElementById('cfg5GIp');
@@ -2266,7 +2352,7 @@
             const qInp = document.getElementById('quick5GIp');
             if (qInp && document.activeElement !== qInp) qInp.value = current5GHost;
           }
-          const labelMap = { laptop: 'Laptop Webcam (0)', ethernet: 'Direct Ethernet (192.168.128.10)', '5g': '5G Modem Camera' };
+          const labelMap = { laptop: 'Laptop webcam', ethernet: 'Direct Ethernet', '5g': '5G modem camera' };
           showToast('Active camera: ' + (labelMap[data.mode] || data.source));
         }
         setTimeout(retryStream, 350);
@@ -2330,13 +2416,21 @@
     let lastCommittedSign = '';
 
     let lastStatusErrorAt = 0;
+    // Sequence number of the last commit event this tab has handled. The
+    // server keeps recent events and returns only newer ones, so every open
+    // dashboard (phone, laptop, extra tabs) gets each event exactly once.
+    let lastEventSeq = null;
     async function pollStatus() {
       const ctrl = new AbortController();
       const killer = setTimeout(() => ctrl.abort(), 4000);
       try {
-        const res = await fetch('/api/status', { signal: ctrl.signal, cache: 'no-store' });
+        const url = lastEventSeq === null ? '/api/status' : '/api/status?since=' + lastEventSeq;
+        const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
         if (!res.ok) throw new Error(`Status request failed (${res.status})`);
-        updateUI(await res.json());
+        const d = await res.json();
+        // A smaller seq means the server restarted: just resync to it.
+        if (typeof d.event_seq === 'number') lastEventSeq = d.event_seq;
+        updateUI(d);
       } catch (e) {
         if (Date.now() - lastStatusErrorAt > 5000) {
           console.warn('SignSpeak status unavailable:', e);
@@ -2362,7 +2456,7 @@
       if (cam && cam.host_5g) {
         current5GHost = cam.host_5g;
         const opt = document.getElementById('opt5g');
-        if (opt) opt.textContent = '📶 5G Modem (' + current5GHost + ':554)';
+        if (opt) opt.textContent = '5G modem (' + current5GHost + ':554)';
         const quick = document.getElementById('lbl5GHostQuick');
         if (quick) quick.textContent = current5GHost + ' (Dynamic RTSP :554)';
         const cfg5G = document.getElementById('cfg5GIp');
@@ -2378,24 +2472,24 @@
       if (cam.connected) {
         sideCam.textContent = 'Live';
         sideCam.className = 'val green';
-        livePill.textContent = 'LIVE';
+        livePill.textContent = 'Live';
         livePill.setAttribute('tone', 'green');
-        headerCamPill.textContent = 'LIVE · 172.16.0.11';
+        headerCamPill.textContent = 'Live · ' + location.hostname;
         headerCamPill.setAttribute('tone', 'green');
         if (trainCamPill) {
-          trainCamPill.textContent = 'LIVE';
+          trainCamPill.textContent = 'Live';
           trainCamPill.setAttribute('tone', 'green');
         }
         if (btnRec && !isRecordingActive) btnRec.disabled = false;
       } else {
         sideCam.textContent = 'Offline';
         sideCam.className = 'val amber';
-        livePill.textContent = 'OFFLINE';
+        livePill.textContent = 'Offline';
         livePill.setAttribute('tone', 'red');
-        headerCamPill.textContent = 'STARTING';
+        headerCamPill.textContent = 'Connecting';
         headerCamPill.setAttribute('tone', 'amber');
         if (trainCamPill) {
-          trainCamPill.textContent = 'OFFLINE';
+          trainCamPill.textContent = 'Offline';
           trainCamPill.setAttribute('tone', 'red');
         }
         if (btnRec && !isRecordingActive) btnRec.disabled = true;
@@ -2404,17 +2498,18 @@
       // 2. Model Info
       if (d.model && d.model.name) {
         const accuracy = d.model.accuracy;
-        const mText = accuracy === null ? 'Personal' : `Personal (${accuracy.toFixed(1)}%)`;
+        const kindLabel = /^Demo/.test(d.model.name || '') ? 'Demo' : 'Personal';
+        const mText = accuracy === null ? kindLabel : `${kindLabel} (${accuracy.toFixed(1)}%)`;
         document.getElementById('sideModel').textContent = mText;
         document.getElementById('headerModelPill').textContent = d.model.name + (accuracy === null ? '' : ` · ${accuracy.toFixed(1)}%`);
         const trHeadPill = document.getElementById('trainHeaderPill');
         const cardModPill = document.getElementById('cardModelPill');
         if (trHeadPill) {
-          trHeadPill.textContent = 'PERSONAL MODEL';
+          trHeadPill.textContent = kindLabel + ' model';
           trHeadPill.setAttribute('tone', 'green');
         }
         if (cardModPill) {
-          cardModPill.textContent = 'PERSONAL';
+          cardModPill.textContent = 'Active';
           cardModPill.setAttribute('tone', 'green');
         }
         const cName = document.getElementById('cardModelName');
@@ -2431,13 +2526,13 @@
         const action = document.getElementById('btnPersonalModelActive');
         if (action) {
           action.disabled = true;
-          action.textContent = 'Personal model active';
+          action.textContent = kindLabel + ' model active';
           action.onclick = null;
         }
       } else if (d.model && d.model.error) {
         document.getElementById('sideModel').textContent = 'Unavailable';
         document.getElementById('sideModel').className = 'val amber';
-        document.getElementById('headerModelPill').textContent = 'PERSONAL MODEL ERROR';
+        document.getElementById('headerModelPill').textContent = 'Model unavailable';
         const name = document.getElementById('cardModelName');
         const detail = document.getElementById('cardModelDetail');
         const accuracy = document.getElementById('cardModelAccuracy');
@@ -2511,6 +2606,11 @@
       // 5. Settings sync
       if (d.settings) {
         currentSettings = Object.assign({}, currentSettings, d.settings);
+        if (typeof d.settings.mirror === 'boolean' && d.settings.mirror !== isMirror) {
+          isMirror = d.settings.mirror;
+          const mb = document.getElementById('mirrorBtn');
+          if (mb) mb.classList.toggle('active', isMirror);
+        }
       }
 
       // 6. Speech Events
@@ -2520,15 +2620,21 @@
           dialDisc.classList.add('flash');
           dialCaption.textContent = 'TYPED';
           setTimeout(() => dialDisc.classList.remove('flash'), 360);
-
-          if (ev.speak_word) {
-            speakText(ev.speak_word);
-          } else if (ev.speak_sentence) {
-            speakText(ev.speak_sentence);
-          } else if (ev.kind === 'letter' && (d.settings.speak_letters || currentSettings.speak_letters) && ev.sign) {
-            speakText(ev.sign);
-          }
+          speakCommitResult(ev);
         });
+      }
+    }
+
+    // Speak a commit result, honouring the "speak words / sentences /
+    // letters automatically" settings.
+    function speakCommitResult(r) {
+      if (!r) return;
+      if (r.speak_word) {
+        if (currentSettings.auto_word !== false) speakText(r.speak_word);
+      } else if (r.speak_sentence) {
+        if (currentSettings.auto_sentence !== false) speakText(r.speak_sentence);
+      } else if (r.kind === 'letter' && currentSettings.speak_letters && r.sign) {
+        speakText(r.sign);
       }
     }
 
@@ -2689,7 +2795,7 @@
         camPayload.host = new5gIp;
         current5GHost = new5gIp;
         const opt = document.getElementById('opt5g');
-        if (opt) opt.textContent = '📶 5G Modem (' + current5GHost + ':554)';
+        if (opt) opt.textContent = '5G modem (' + current5GHost + ':554)';
         const quick = document.getElementById('lbl5GHostQuick');
         if (quick) quick.textContent = current5GHost + ' (Dynamic RTSP :554)';
       }
@@ -2712,7 +2818,7 @@
         min_vote_ratio: 0.60,
         confidence: 0.55,
         tts_provider: 'sarvam',
-        tts_language: 'hi-IN',
+        tts_language: 'en-IN',
         tts_rate: 0,
         tts_volume: 100,
         auto_word: true,
@@ -2800,7 +2906,7 @@
 
         // Text formatting
         let displayTxt = item.display;
-        if (item.label === '__CONTROL__:BACKSPACE') {
+        if (item.label === '__BACKSPACE__') {
           displayTxt = 'DEL';
         } else if (item.is_custom) {
           displayTxt = item.display.length > 4 ? item.display.slice(0, 4) + '…' : item.display;
@@ -2871,7 +2977,7 @@
 
       const hintEl = document.getElementById('selectedTrainHint');
       if (hintEl) {
-        if (item.label === '__CONTROL__:BACKSPACE') {
+        if (item.label === '__BACKSPACE__') {
           hintEl.textContent = 'Custom control handshape: deletes the last character or transcript token.';
         } else if (item.is_custom) {
           hintEl.textContent = 'Custom handshape: inserts this word or phrase with word spacing.';
@@ -3189,9 +3295,13 @@
             btn.textContent = 'Transcribing…';
             btn.classList.remove('active');
 
-            const blob = new Blob(audioChunks, { type: 'audio/wav' });
+            // MediaRecorder produces WebM/Ogg/MP4, never WAV; label the
+            // upload with its real format so Sarvam can decode it.
+            const mime = (mediaRecorder.mimeType || 'audio/webm').split(';')[0];
+            const ext = mime.includes('ogg') ? 'ogg' : (mime.includes('mp4') ? 'm4a' : (mime.includes('wav') ? 'wav' : 'webm'));
+            const blob = new Blob(audioChunks, { type: mime });
             const formData = new FormData();
-            formData.append('file', blob, 'phrase.wav');
+            formData.append('file', blob, 'phrase.' + ext);
 
             showToast('Transcribing audio via Sarvam Saaras AI…');
             try {
@@ -3210,13 +3320,13 @@
               console.error(err);
               showToast('Sarvam transcription request failed');
             } finally {
-              btn.textContent = '🎤 Record phrase';
+              btn.textContent = 'Record phrase';
             }
           };
 
           mediaRecorder.start();
           isRecordingVoice = true;
-          btn.textContent = '⏹ Stop recording';
+          btn.textContent = 'Stop recording';
           btn.classList.add('active');
           showToast('Recording phrase for Sarvam Saaras AI… Speak clearly');
           return;
@@ -3242,7 +3352,7 @@
       rec.maxAlternatives = 1;
 
       rec.onstart = () => {
-        btn.textContent = '🔴 Listening…';
+        btn.textContent = 'Listening…';
         btn.classList.add('active');
       };
 
@@ -3259,7 +3369,7 @@
       };
 
       rec.onend = () => {
-        btn.textContent = '🎤 Record phrase';
+        btn.textContent = 'Record phrase';
         btn.classList.remove('active');
       };
 

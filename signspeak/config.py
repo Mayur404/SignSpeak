@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Any
@@ -70,11 +71,48 @@ class Settings:
         return asdict(self)
 
     def update(self, values: dict[str, Any]) -> None:
-        valid = {f.name for f in fields(self)}
-        for key, value in values.items():
-            if key in valid:
-                setattr(self, key, value)
-        self.sanitized()
+        """Apply ``values`` all-or-nothing.
+
+        The candidate is validated on a copy first, so an invalid value (e.g.
+        ``"abc"`` for a number) raises without leaving a half-applied,
+        unsanitized field behind for the camera worker to trip over.
+        """
+        candidate = Settings(**asdict(self))
+        for f in fields(self):
+            if f.name in values:
+                setattr(candidate, f.name, _coerce(values[f.name], f.default))
+        candidate.sanitized()
+        for f in fields(self):
+            setattr(self, f.name, getattr(candidate, f.name))
+
+
+_FALSE_WORDS = {"0", "false", "no", "off", ""}
+
+
+def _coerce(value: Any, default: Any) -> Any:
+    """Convert a raw JSON/settings value to the type of the field's default."""
+    if isinstance(default, bool):
+        if isinstance(value, str):
+            return value.strip().lower() not in _FALSE_WORDS
+        return bool(value)
+    if isinstance(default, int):
+        if isinstance(value, str):
+            value = float(value)
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError("Numeric settings must be finite.")
+        return int(value)
+    if isinstance(default, float):
+        value = float(value)
+        if not math.isfinite(value):
+            raise ValueError("Numeric settings must be finite.")
+        return value
+    if isinstance(default, str):
+        if value is None:
+            return ""
+        if not isinstance(value, (str, int, float)):
+            raise TypeError("Expected text.")
+        return str(value)
+    return value
 
 
 def load_settings(path: Path = SETTINGS_FILE) -> Settings:
@@ -83,7 +121,12 @@ def load_settings(path: Path = SETTINGS_FILE) -> Settings:
         if path.exists():
             raw = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(raw, dict):
-                settings.update(raw)
+                # One corrupt field must not throw away every saved setting.
+                for key, value in raw.items():
+                    try:
+                        settings.update({key: value})
+                    except (ValueError, TypeError, OverflowError):
+                        pass
     except (OSError, ValueError, TypeError):
         pass
     return settings.sanitized()

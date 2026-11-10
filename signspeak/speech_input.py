@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -19,6 +20,16 @@ except Exception:  # pragma: no cover - headless VM without Qt libraries
 
     def Signal(*args, **kwargs):  # type: ignore[no-redef]
         return None
+
+
+_AUDIO_TYPES = {
+    ".wav": "audio/wav",
+    ".webm": "audio/webm",
+    ".mp3": "audio/mpeg",
+    ".ogg": "audio/ogg",
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+}
 
 
 def transcribe_audio(path_or_bytes: Path | bytes, filename: str = "phrase.wav") -> tuple[str, str]:
@@ -42,13 +53,10 @@ def transcribe_audio(path_or_bytes: Path | bytes, filename: str = "phrase.wav") 
     for name, value in parts:
         body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n".encode())
         body.extend(value + b"\r\n")
-    content_type = "audio/wav"
-    if filename.endswith(".webm"):
-        content_type = "audio/webm"
-    elif filename.endswith(".mp3"):
-        content_type = "audio/mpeg"
-    elif filename.endswith(".ogg"):
-        content_type = "audio/ogg"
+    # The name comes from the browser; keep it to a safe header token.
+    filename = re.sub(r"[^A-Za-z0-9._-]", "_", Path(str(filename)).name)[:64] or "phrase.wav"
+    extension = Path(filename).suffix.lower()
+    content_type = _AUDIO_TYPES.get(extension, "audio/wav")
 
     body.extend(
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\nContent-Type: {content_type}\r\n\r\n".encode()

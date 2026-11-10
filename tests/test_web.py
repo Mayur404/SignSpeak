@@ -5,7 +5,9 @@ import os
 import unittest
 import hashlib
 import io
+import tempfile
 import time
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -15,6 +17,33 @@ from signspeak.config import Settings
 from signspeak.paths import USER_MODEL
 from signspeak.web.server import create_app
 from signspeak.web.streamer import WebStreamEngine
+
+
+_ISOLATION: dict = {}
+
+
+def setUpModule():
+    # Keep the tests away from the real project files: camera presets rewrite
+    # CAMERA_HOST in .env and every settings change is saved to
+    # data/settings.json.
+    _ISOLATION["tmp"] = tempfile.TemporaryDirectory()
+    _ISOLATION["camera_host"] = os.environ.get("CAMERA_HOST")
+    _ISOLATION["patchers"] = [
+        patch("signspeak.web.server.APP_ROOT", Path(_ISOLATION["tmp"].name)),
+        patch("signspeak.web.streamer.save_settings"),
+    ]
+    for patcher in _ISOLATION["patchers"]:
+        patcher.start()
+
+
+def tearDownModule():
+    for patcher in reversed(_ISOLATION["patchers"]):
+        patcher.stop()
+    if _ISOLATION["camera_host"] is None:
+        os.environ.pop("CAMERA_HOST", None)
+    else:
+        os.environ["CAMERA_HOST"] = _ISOLATION["camera_host"]
+    _ISOLATION["tmp"].cleanup()
 
 
 class WebAppTestCase(unittest.TestCase):
@@ -35,7 +64,7 @@ class WebAppTestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn(b"SignSpeak", res.data)
         self.assertIn(b"Live translate", res.data)
-        self.assertIn(b"Personal model active", res.data)
+        self.assertIn(b"Model active", res.data)
         self.assertNotIn(b"Use bundled", res.data)
 
     def test_api_status(self):
@@ -185,6 +214,61 @@ class WebAppTestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         status = self.client.get("/api/status").get_json()
         self.assertEqual(status["settings"]["hold_ms"], 650)
+
+    def test_invalid_settings_are_rejected_and_leave_settings_intact(self):
+        before = self.engine.settings.to_dict()
+        res = self.client.post("/api/settings", json={"hold_ms": 900, "inference_width": "abc"})
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(self.engine.settings.to_dict(), before)
+
+    def test_status_events_are_not_consumed_by_other_readers(self):
+        with self.engine._lock:
+            self.engine._event_seq += 1
+            seq = self.engine._event_seq
+            self.engine._recent_events.append({"seq": seq, "sign": "HELLO", "kind": "word",
+                                               "speak_word": "HELLO", "speak_sentence": None})
+        since = seq - 1
+        # A plain status read (e.g. opening Settings) returns no events...
+        self.assertEqual(self.client.get("/api/status").get_json()["events"], [])
+        # ...and two viewers both receive the same event.
+        for _ in range(2):
+            data = self.client.get(f"/api/status?since={since}").get_json()
+            self.assertEqual([ev["sign"] for ev in data["events"]], ["HELLO"])
+            self.assertGreaterEqual(data["event_seq"], seq)
+        self.assertEqual(self.client.get(f"/api/status?since={seq}").get_json()["events"], [])
+
+    def test_custom_stream_url_is_used_exactly(self):
+        host = os.environ.get("CAMERA_HOST", "").strip() or "10.101.0.74"
+        main = f"rtsp://admin:admin123@{host}:554/avstream/channel=1/stream=0.sdp"
+        res = self.client.post("/api/camera", json={"source": main})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()["source"], main)
+        self.assertEqual(res.get_json()["mode"], "custom")
+        self.client.post("/api/camera", json={"mode": "laptop"})
+
+    def test_empty_camera_host_falls_back_to_default(self):
+        with patch.dict(os.environ, {"CAMERA_HOST": ""}):
+            res = self.client.post("/api/camera", json={"mode": "5g"})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("@10.101.0.74:554", res.get_json()["source"])
+        self.client.post("/api/camera", json={"mode": "laptop"})
+
+    def test_concurrent_text_actions_do_not_lose_letters(self):
+        import threading
+
+        self.client.post("/api/action", json={"action": "clear"})
+
+        def type_letters():
+            for _ in range(200):
+                self.engine.composer_action("type", "A")
+
+        threads = [threading.Thread(target=type_letters) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(len(self.engine.composer.word), 800)
+        self.client.post("/api/action", json={"action": "clear"})
 
     def test_dataset_and_custom_words(self):
         res = self.client.get("/api/dataset")

@@ -11,7 +11,7 @@ unavailable. Other supported platforms use locally installed voices through
 
 ## Sign-Language-to-Text-and-Speech
 
-SignSpeak's bundled classifier and ASL reference material are based on
+SignSpeak's ASL reference material and original feature layout are based on
 [Sign-Language-to-Text-and-Speech](https://github.com/tanmayJivnani/Sign-Language-to-Text-and-Speech)
 by TanmayJivnani, Copyright (c) 2024. The upstream project is distributed under
 the MIT License:

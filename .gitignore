@@ -12,15 +12,13 @@ build/
 dist/
 *.egg-info/
 
-# Ignore temporary joblib files, but keep trained sign models
+# Ignore joblib files, but keep the shipped demo model
 *.joblib
-!signmodel.joblib
-!data/user_model.joblib
+!demo_model.joblib
 
 # Keep trained model, dataset, and settings template
 data/*
 !data/.gitkeep
-!data/user_model.joblib
 !data/user_dataset.npz
 !data/settings.json
 

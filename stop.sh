@@ -25,8 +25,16 @@ if [[ -f signspeak.pid ]]; then
     rm -f signspeak.pid signspeak.port
 fi
 
-# Fallback check for any dangling app.py processes
-pkill -f "python.*app.py" 2>/dev/null && STOPPED=1 || true
+# Fallback for a SignSpeak process whose PID file was lost. Only stop
+# app.py processes running from this folder: a bare `pkill -f app.py` would
+# also kill unrelated Python apps on the shared edge VM.
+HERE=$(pwd -P)
+for pid in $(pgrep -f "python[0-9.]* .*app\.py" 2>/dev/null || true); do
+    if [[ "$(readlink -f "/proc/$pid/cwd" 2>/dev/null)" == "$HERE" ]]; then
+        echo "Stopping leftover SignSpeak process (PID: $pid)..."
+        kill "$pid" 2>/dev/null && STOPPED=1 || true
+    fi
+done
 
 if [[ $STOPPED -eq 1 ]]; then
     echo "SignSpeak stopped successfully."

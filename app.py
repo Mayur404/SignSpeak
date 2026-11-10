@@ -116,11 +116,29 @@ def run_web_app(host: str = "0.0.0.0", port: int = 18473, camera: str | None = N
     return 0
 
 
+DEFAULT_PORT = 18473
+
+
+def _env_port() -> int:
+    """WEB_PORT from the environment / .env, falling back to 18473."""
+    raw = os.environ.get("WEB_PORT", "").strip()
+    if not raw:
+        return DEFAULT_PORT
+    try:
+        port = int(raw)
+    except ValueError:
+        port = 0
+    if not 1 <= port <= 65535:
+        print(f"WARNING: WEB_PORT={raw!r} in .env is not a valid port (1-65535); using {DEFAULT_PORT}.")
+        return DEFAULT_PORT
+    return port
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="SignSpeak — ASL & Gesture Recognition")
     parser.add_argument("--desktop", action="store_true", help="Launch the legacy Qt desktop GUI")
-    parser.add_argument("--host", default=os.environ.get("WEB_HOST", "0.0.0.0"), help="Host to bind (default: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=int(os.environ.get("WEB_PORT", 18473)), help="Port to bind (default: 18473)")
+    parser.add_argument("--host", default=os.environ.get("WEB_HOST", "").strip() or "0.0.0.0", help="Host to bind (default: WEB_HOST in .env, else 0.0.0.0)")
+    parser.add_argument("--port", type=int, default=_env_port(), help=f"Port to bind (default: WEB_PORT in .env, else {DEFAULT_PORT})")
     parser.add_argument("--camera", type=str, default=None, help="Override camera RTSP URL or device index")
     parser.add_argument(
         "--http",
