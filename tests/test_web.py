@@ -257,3 +257,45 @@ class CameraHostTestCase(unittest.TestCase):
         with patch("signspeak.web.streamer.cv2.VideoCapture") as capture:
             self.assertIsNone(engine._open_camera(old))
         capture.assert_not_called()
+
+
+class BrowserCameraTestCase(unittest.TestCase):
+    def setUp(self):
+        self.engine = WebStreamEngine(Settings(camera_source="0"))
+        self.client = create_app(self.engine).test_client()
+        import cv2
+        ok, jpeg = cv2.imencode(".jpg", np.full((48, 64, 3), 120, dtype=np.uint8))
+        self.jpeg = jpeg.tobytes()
+
+    def test_laptop_mode_from_remote_browser_uses_browser_camera(self):
+        res = self.client.post(
+            "/api/camera", json={"mode": "laptop"}, environ_base={"REMOTE_ADDR": "10.20.30.40"}
+        )
+        self.assertEqual(res.get_json()["source"], "browser")
+        self.assertEqual(res.get_json()["mode"], "laptop")
+        # Local browser still opens the server's own webcam.
+        res_local = self.client.post("/api/camera", json={"mode": "laptop"})
+        self.assertEqual(res_local.get_json()["source"], "0")
+
+    def test_browser_frames_accepted_only_when_active(self):
+        res = self.client.post("/api/browser_frame", data=self.jpeg, content_type="image/jpeg")
+        self.assertEqual(res.status_code, 409)
+
+        self.engine.switch_camera("browser")
+        source = self.engine._open_camera("browser")
+        res = self.client.post("/api/browser_frame", data=self.jpeg, content_type="image/jpeg")
+        self.assertEqual(res.status_code, 204)
+        ok, frame = source.read()
+        self.assertTrue(ok)
+        self.assertEqual(frame.shape, (48, 64, 3))
+        self.assertEqual(source.read()[0], False)  # newest frame is returned once
+
+        bad = self.client.post("/api/browser_frame", data=b"not a jpeg", content_type="image/jpeg")
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(self.client.post("/api/browser_frame").status_code, 400)
+
+    def test_status_reports_browser_source_as_laptop(self):
+        self.engine.switch_camera("browser")
+        cam = self.client.get("/api/status").get_json()["camera"]
+        self.assertEqual(cam["raw_source"], "browser")
+        self.assertEqual(cam["mode"], "laptop")

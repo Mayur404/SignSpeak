@@ -52,12 +52,55 @@ from ..vision import (
     SPARSH_STREAM_PATHS,
     RTSP_OPEN_TIMEOUT_MS,
     RTSP_READ_TIMEOUT_MS,
+    RTSP_STALL_SECONDS,
     _rounded_rect,
     _camera_candidates,
     _safe_camera_source,
     get_tracker,
     warm_tracker,
 )
+
+BROWSER_SOURCE = "browser"
+
+
+class BrowserFrameSource:
+    """Camera frames pushed by the viewer's browser (getUserMedia -> JPEG POST).
+
+    The edge VM has no webcam, so "Laptop Webcam" opened from a remote browser
+    streams the laptop's camera to the server instead. Mirrors the
+    _LatestFrameReader interface: read() returns only the newest unseen frame.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._frame = None
+        self._sequence = 0
+        self.last_frame_at = 0.0
+
+    def push_jpeg(self, data: bytes) -> bool:
+        frame = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if frame is None or frame.size == 0:
+            return False
+        with self._lock:
+            self._frame = frame
+            self._sequence += 1
+            self.last_frame_at = time.monotonic()
+        return True
+
+    def read(self):
+        with self._lock:
+            if self._sequence == 0:
+                return False, None
+            self._sequence = 0
+            return True, self._frame
+
+    def release(self) -> None:
+        with self._lock:
+            self._frame = None
+            self._sequence = 0
+
+    close = release
+
 
 def _with_current_5g_host(source: str, env_host: str) -> str:
     """Point a saved 5G Sparsh RTSP URL at the current CAMERA_HOST.
@@ -120,6 +163,7 @@ class WebStreamEngine:
             self.engine = None
 
         # Camera & capture state
+        self._browser_source = BrowserFrameSource()
         self._camera_source = self._resolve_initial_source()
         self._active_camera_source: str | None = None
         self._cap = None
@@ -234,7 +278,7 @@ class WebStreamEngine:
         """Safely release the active capture object."""
         if self._cap is not None:
             try:
-                if isinstance(self._cap, _LatestFrameReader):
+                if isinstance(self._cap, (_LatestFrameReader, BrowserFrameSource)):
                     self._cap.close()
                 else:
                     self._cap.release()
@@ -250,6 +294,10 @@ class WebStreamEngine:
         source = str(source).strip()
         if source.lower() in ("webcam", "laptop", "cam0", "0", ""):
             source = "0"
+
+        if source == BROWSER_SOURCE:
+            self._browser_source.release()
+            return self._browser_source
 
         # 1. Check if integer index (local webcam)
         if source.isdigit():
@@ -308,6 +356,7 @@ class WebStreamEngine:
         consecutive_failures = 0
         open_failures = 0
         last_failed_source: str | None = None
+        last_placeholder_at = 0.0
         last_frame_time = time.monotonic()
         last_good_frame = time.monotonic()
         last_tracker_retry = 0.0
@@ -387,12 +436,29 @@ class WebStreamEngine:
                 ok, frame = False, None
 
             if not ok or frame is None:
+                if isinstance(cap, BrowserFrameSource):
+                    # Nothing to reconnect: the browser pushes frames when the
+                    # dashboard tab is open and visible. Show why it's waiting.
+                    now = time.monotonic()
+                    if now - cap.last_frame_at > 2.0:
+                        self._camera_connected = False
+                        self._latest_fps = 0.0
+                        if now - last_placeholder_at > 0.5:
+                            last_placeholder_at = now
+                            self._render_placeholder_frame(
+                                "Waiting for laptop camera...",
+                                BROWSER_SOURCE,
+                                hint="Keep the SignSpeak tab open and allow camera access (needs https://)",
+                            )
+                    time.sleep(0.02)
+                    continue
                 consecutive_failures += 1
                 # The RTSP reader returns "no new frame" instantly while the
                 # stream catches up, so judge by time, not by count: only
-                # reconnect after 12 s (webcam: 3 s) without any frame. Reopening
-                # the 5G RTSP stream costs ~15 s, so don't drop it on a short hiccup.
-                stall_limit = 12.0 if isinstance(cap, _LatestFrameReader) else 3.0
+                # reconnect after CAMERA_STALL_TIMEOUT_MS (default 30 s; webcam: 3 s)
+                # without any frame. Reopening the 5G RTSP stream is slow, so
+                # ride out lag instead of dropping the stream on a hiccup.
+                stall_limit = RTSP_STALL_SECONDS if isinstance(cap, _LatestFrameReader) else 3.0
                 if time.monotonic() - last_good_frame > stall_limit:
                     print(f"[camera] no frames for {stall_limit:.0f}s - reconnecting", flush=True)
                     consecutive_failures = 0
@@ -409,6 +475,7 @@ class WebStreamEngine:
             if self._latest_fps == 0:
                 print(f"[camera] first frame received ({frame.shape[1]}x{frame.shape[0]})", flush=True)
             last_good_frame = now
+            self._camera_connected = True
             h, w = frame.shape[:2]
             self._camera_dims = (w, h)
 
@@ -782,7 +849,7 @@ class WebStreamEngine:
 
         raw_src = str(self._camera_source).strip()
         env_host = os.environ.get("CAMERA_HOST", "10.101.0.74").strip()
-        if raw_src in ("0", "webcam", "laptop") or raw_src.isdigit():
+        if raw_src in ("0", "webcam", "laptop", BROWSER_SOURCE) or raw_src.isdigit():
             cam_mode = "laptop"
         elif "192.168.128.10" in raw_src:
             cam_mode = "ethernet"
@@ -825,6 +892,17 @@ class WebStreamEngine:
         }
 
     # ---- Actions ---------------------------------------------------------
+    def push_browser_frame(self, data: bytes) -> bool | None:
+        """Accept a JPEG frame from the viewer's browser camera.
+
+        Returns None when the browser camera isn't the active source, False
+        when the frame can't be decoded, True when it was accepted.
+        """
+        with self._lock:
+            if str(self._camera_source).strip() != BROWSER_SOURCE:
+                return None
+        return self._browser_source.push_jpeg(data)
+
     def switch_camera(self, new_source: str) -> None:
         """Switch camera stream source dynamically."""
         new_source = str(new_source).strip()

@@ -2150,7 +2150,92 @@
       }
     }
 
+    // ---- Laptop webcam through the browser ------------------------------
+    // Opened from another machine (e.g. a laptop viewing the edge VM), the
+    // server has no access to this laptop's camera. The server then reports
+    // source "browser" and this page captures the webcam and POSTs JPEG
+    // frames to /api/browser_frame, one in flight at a time (no fps cap).
+    const browserCam = { stream: null, video: null, canvas: null, running: false, starting: false, blocked: false };
+
+    function syncBrowserCamera(cam) {
+      const wanted = !!(cam && cam.raw_source === 'browser') && !document.hidden;
+      if (wanted && !browserCam.running && !browserCam.starting && !browserCam.blocked) {
+        startBrowserCamera();
+      } else if (!wanted && browserCam.running) {
+        stopBrowserCamera();
+      }
+    }
+
+    async function startBrowserCamera() {
+      if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        browserCam.blocked = true;
+        showToast('Laptop camera needs HTTPS: restart SignSpeak with --https, then open https://' + location.host);
+        return;
+      }
+      browserCam.starting = true;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
+          audio: false
+        });
+        const video = document.createElement('video');
+        video.muted = true;
+        video.playsInline = true;
+        video.srcObject = stream;
+        await video.play();
+        browserCam.stream = stream;
+        browserCam.video = video;
+        browserCam.canvas = document.createElement('canvas');
+        browserCam.running = true;
+        sendBrowserFrames();
+      } catch (err) {
+        browserCam.blocked = true;
+        const reason = err && err.name === 'NotAllowedError' ? 'permission denied' : ((err && err.message) || String(err));
+        showToast('Could not open laptop camera: ' + reason);
+      } finally {
+        browserCam.starting = false;
+      }
+    }
+
+    function stopBrowserCamera() {
+      browserCam.running = false;
+      if (browserCam.stream) browserCam.stream.getTracks().forEach(t => t.stop());
+      browserCam.stream = null;
+      browserCam.video = null;
+    }
+
+    async function sendBrowserFrames() {
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      while (browserCam.running) {
+        const started = performance.now();
+        const v = browserCam.video;
+        const c = browserCam.canvas;
+        if (v && c && v.videoWidth) {
+          const scale = Math.min(1, 640 / v.videoWidth);
+          c.width = Math.round(v.videoWidth * scale);
+          c.height = Math.round(v.videoHeight * scale);
+          c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+          const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.7));
+          if (blob && browserCam.running) {
+            try {
+              const res = await fetch('/api/browser_frame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'image/jpeg' },
+                body: blob
+              });
+              if (res.status === 409) { stopBrowserCamera(); break; }
+            } catch (e) {
+              await sleep(500);
+            }
+          }
+        }
+        // Yield briefly only if no frame was ready yet (camera warming up).
+        if (performance.now() - started < 1) await sleep(10);
+      }
+    }
+
     async function onCameraSelect(val) {
+      if (val === 'laptop') browserCam.blocked = false;
       if (val === '5g') {
         const quickInput = document.getElementById('quick5GIp');
         if (quickInput && quickInput.value.trim()) {
@@ -2266,6 +2351,7 @@
     function updateUI(d) {
       // 1. Sidebar & Header Status
       const cam = d.camera;
+      syncBrowserCamera(cam);
       document.getElementById('fpsLabel').textContent = cam.fps.toFixed(1) + ' FPS';
       const sideCam = document.getElementById('sideCamera');
       const livePill = document.getElementById('liveStatusPill');
@@ -2285,7 +2371,7 @@
 
       const camSel = document.getElementById('cameraSelect');
       if (camSel && document.activeElement !== camSel) {
-        const mode = cam.mode || (cam.raw_source === '0' ? 'laptop' : (cam.raw_source && cam.raw_source.includes('192.168.128.10') ? 'ethernet' : '5g'));
+        const mode = cam.mode || ((cam.raw_source === '0' || cam.raw_source === 'browser') ? 'laptop' : (cam.raw_source && cam.raw_source.includes('192.168.128.10') ? 'ethernet' : '5g'));
         camSel.value = mode;
       }
 
@@ -2518,7 +2604,7 @@
       currentSettings = Object.assign({}, currentSettings, s);
 
       // Camera
-      const camMode = d.camera.mode || (d.camera.raw_source === '0' ? 'laptop' : (d.camera.raw_source && d.camera.raw_source.includes('192.168.128.10') ? 'ethernet' : '5g'));
+      const camMode = d.camera.mode || ((d.camera.raw_source === '0' || d.camera.raw_source === 'browser') ? 'laptop' : (d.camera.raw_source && d.camera.raw_source.includes('192.168.128.10') ? 'ethernet' : '5g'));
       const selMode = document.getElementById('cfgCamMode');
       if (selMode) selMode.value = camMode;
       const inp5G = document.getElementById('cfg5GIp');

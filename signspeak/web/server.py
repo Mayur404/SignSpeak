@@ -38,6 +38,22 @@ def get_network_ips() -> list[str]:
     return ips
 
 
+MAX_BROWSER_FRAME_BYTES = 3 * 1024 * 1024
+
+
+def _is_local_request() -> bool:
+    """True when the browser runs on the same machine as the server."""
+    remote = (request.remote_addr or "").strip()
+    if not remote:
+        return True
+    try:
+        if ipaddress.ip_address(remote).is_loopback:
+            return True
+    except ValueError:
+        return False
+    return remote in get_network_ips()
+
+
 def update_env_camera_host(new_host: str) -> None:
     """Persist updated 5G dynamic IP into .env and runtime environment."""
     new_host = new_host.strip()
@@ -162,8 +178,14 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
         else:
             env_host = os.environ.get("CAMERA_HOST", "10.101.0.74").strip()
 
-        if mode in ("webcam", "laptop", "0", "cam0") or source in ("0", "webcam", "laptop"):
-            resolved_source = "0"
+        if mode in ("webcam", "laptop", "0", "cam0", "browser") or source in ("0", "webcam", "laptop", "browser"):
+            # "Laptop webcam" means the viewer's own camera. When the dashboard
+            # is opened from another machine (e.g. a laptop viewing the edge VM)
+            # the server can't open that camera, so the browser streams it.
+            use_browser = data.get("browser")
+            if not isinstance(use_browser, bool):
+                use_browser = mode == "browser" or source == "browser" or not _is_local_request()
+            resolved_source = "browser" if use_browser else "0"
             resolved_mode = "laptop"
         elif mode in ("ethernet", "eth", "192.168.128.10") or "192.168.128.10" in source:
             resolved_source = "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=1.sdp"
@@ -187,6 +209,21 @@ def create_app(engine: WebStreamEngine | None = None) -> Flask:
             "mode": resolved_mode,
             "host_5g": env_host,
         })
+
+    @app.route("/api/browser_frame", methods=["POST"])
+    def api_browser_frame():
+        """Receive one JPEG frame from the viewer's browser camera."""
+        if request.content_length and request.content_length > MAX_BROWSER_FRAME_BYTES:
+            return jsonify({"status": "error", "message": "Frame too large"}), 413
+        data = request.get_data(cache=False)
+        if not data or len(data) > MAX_BROWSER_FRAME_BYTES:
+            return jsonify({"status": "error", "message": "No frame received"}), 400
+        accepted = engine.push_browser_frame(data)
+        if accepted is None:
+            return jsonify({"status": "ignored", "message": "Browser camera is not the active source"}), 409
+        if not accepted:
+            return jsonify({"status": "error", "message": "Frame is not a valid JPEG"}), 400
+        return ("", 204)
 
     @app.route("/api/settings", methods=["POST"])
     def api_settings():

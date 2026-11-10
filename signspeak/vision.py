@@ -111,10 +111,13 @@ def _env_ms(name: str, default: int) -> int:
         return default
 
 
-# Over the 5G link the Sparsh camera can take 15 s or more to finish the RTSP
-# handshake and stream probe, so short open timeouts never connect.
+# Web app RTSP timeouts. Over the 5G link the Sparsh camera can take 15 s or
+# more to finish the RTSP handshake and stream probe, and the link can lag.
 RTSP_OPEN_TIMEOUT_MS = _env_ms("CAMERA_OPEN_TIMEOUT_MS", 60000)
-RTSP_READ_TIMEOUT_MS = _env_ms("CAMERA_READ_TIMEOUT_MS", 5000)
+# The 5G link can lag for several seconds; don't abort a read too early.
+RTSP_READ_TIMEOUT_MS = _env_ms("CAMERA_READ_TIMEOUT_MS", 20000)
+# Seconds without any RTSP frame before the stream is reopened.
+RTSP_STALL_SECONDS = _env_ms("CAMERA_STALL_TIMEOUT_MS", 30000) / 1000.0
 
 SPARSH_HOST = os.environ.get("CAMERA_HOST") or "10.101.0.74"
 SPARSH_PORT = 554
@@ -758,8 +761,8 @@ class CameraWorker(QThread):
             for url in candidates:
                 try:
                     params = [
-                        cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT_MS,
-                        cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_READ_TIMEOUT_MS,
+                        cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000,
+                        cv2.CAP_PROP_READ_TIMEOUT_MSEC, 2000,
                     ]
                     try:
                         cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG, params)
