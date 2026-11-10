@@ -111,9 +111,9 @@ def _env_ms(name: str, default: int) -> int:
         return default
 
 
-# Over the 5G link the Sparsh camera takes ~13-15 s to finish the RTSP
+# Over the 5G link the Sparsh camera can take 15 s or more to finish the RTSP
 # handshake and stream probe, so short open timeouts never connect.
-RTSP_OPEN_TIMEOUT_MS = _env_ms("CAMERA_OPEN_TIMEOUT_MS", 20000)
+RTSP_OPEN_TIMEOUT_MS = _env_ms("CAMERA_OPEN_TIMEOUT_MS", 60000)
 RTSP_READ_TIMEOUT_MS = _env_ms("CAMERA_READ_TIMEOUT_MS", 5000)
 
 SPARSH_HOST = os.environ.get("CAMERA_HOST") or "10.101.0.74"
