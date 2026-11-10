@@ -10,6 +10,7 @@ import math
 import os
 import sys
 import threading
+from urllib.parse import urlsplit, urlunsplit
 import time
 from typing import Any, Generator
 
@@ -48,6 +49,7 @@ from ..vision import (
     HandTracker,
     Observation,
     _LatestFrameReader,
+    SPARSH_STREAM_PATHS,
     RTSP_OPEN_TIMEOUT_MS,
     RTSP_READ_TIMEOUT_MS,
     _rounded_rect,
@@ -56,6 +58,29 @@ from ..vision import (
     get_tracker,
     warm_tracker,
 )
+
+def _with_current_5g_host(source: str, env_host: str) -> str:
+    """Point a saved 5G Sparsh RTSP URL at the current CAMERA_HOST.
+
+    The modem's WAN IP changes on every reconnect. Settings saved a full URL
+    with the old IP, which otherwise overrides the updated CAMERA_HOST in .env.
+    Direct-Ethernet (192.168.128.10) and custom URLs are left untouched.
+    """
+    try:
+        parsed = urlsplit(source)
+        host = parsed.hostname or ""
+    except ValueError:
+        return source
+    if parsed.scheme.lower() != "rtsp" or host in ("", "192.168.128.10", env_host):
+        return source
+    is_sparsh_path = any(path == parsed.path for paths in SPARSH_STREAM_PATHS.values() for path in paths)
+    if not is_sparsh_path or not host.startswith("10.101."):
+        return source
+    netloc = parsed.netloc.rsplit("@", 1)
+    creds = netloc[0] + "@" if len(netloc) == 2 else ""
+    port = f":{parsed.port}" if parsed.port else ""
+    return urlunsplit((parsed.scheme, f"{creds}{env_host}{port}", parsed.path, parsed.query, parsed.fragment))
+
 
 # Color constants (BGR)
 ACCENT_CYAN = (238, 211, 34)       # #22D3EE
@@ -176,13 +201,13 @@ class WebStreamEngine:
         if env_source:
             return env_source
         saved = (self.settings.camera_source or "").strip()
+        env_host = os.environ.get("CAMERA_HOST", "").strip() or "10.101.0.74"
         if saved and not saved.isdigit():
-            return saved
+            return _with_current_5g_host(saved, env_host)
         if saved.isdigit() and (
             sys.platform == "win32" or os.path.exists(f"/dev/video{int(saved)}")
         ):
             return saved
-        env_host = os.environ.get("CAMERA_HOST", "").strip() or "10.101.0.74"
         return f"rtsp://admin:admin123@{env_host}:554/avstream/channel=1/stream=1.sdp"
 
     def start(self) -> None:
@@ -218,6 +243,7 @@ class WebStreamEngine:
             self._cap = None
         self._active_camera_source = None
         self._camera_connected = False
+        self._latest_fps = 0.0
 
     def _open_camera(self, source: str):
         """Open camera from integer webcam index, RTSP URL, or file path."""
@@ -249,7 +275,15 @@ class WebStreamEngine:
         # 2. RTSP or Video File
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
         candidates = _camera_candidates(source)
+        started = time.monotonic()
         for url in candidates:
+            with self._lock:
+                switched = str(self._camera_source).strip() != source
+            if switched:
+                print("[camera] source changed - abandoning remaining attempts", flush=True)
+                return None
+            attempt = time.monotonic()
+            print(f"[camera] connecting to {_safe_camera_source(url)} (timeout {RTSP_OPEN_TIMEOUT_MS / 1000:.0f}s)...", flush=True)
             try:
                 params = [
                     cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT_MS,
@@ -260,10 +294,13 @@ class WebStreamEngine:
                 except (TypeError, cv2.error):
                     cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
                 if cap.isOpened():
+                    print(f"[camera] connected in {time.monotonic() - attempt:.1f}s: {_safe_camera_source(url)}", flush=True)
                     return _LatestFrameReader(cap)
                 cap.release()
             except Exception:
                 pass
+            print(f"[camera] failed after {time.monotonic() - attempt:.1f}s: {_safe_camera_source(url)}", flush=True)
+        print(f"[camera] all {len(candidates)} stream paths failed ({time.monotonic() - started:.1f}s total); retrying", flush=True)
         return None
 
     def _worker_loop(self) -> None:
@@ -357,6 +394,7 @@ class WebStreamEngine:
                 # the 5G RTSP stream costs ~15 s, so don't drop it on a short hiccup.
                 stall_limit = 12.0 if isinstance(cap, _LatestFrameReader) else 3.0
                 if time.monotonic() - last_good_frame > stall_limit:
+                    print(f"[camera] no frames for {stall_limit:.0f}s - reconnecting", flush=True)
                     consecutive_failures = 0
                     last_good_frame = time.monotonic()
                     self._camera_connected = False
@@ -368,6 +406,8 @@ class WebStreamEngine:
 
             consecutive_failures = 0
             now = time.monotonic()
+            if self._latest_fps == 0:
+                print(f"[camera] first frame received ({frame.shape[1]}x{frame.shape[0]})", flush=True)
             last_good_frame = now
             h, w = frame.shape[:2]
             self._camera_dims = (w, h)

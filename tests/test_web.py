@@ -233,3 +233,27 @@ class WebAppTestCase(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+
+class CameraHostTestCase(unittest.TestCase):
+    def test_saved_5g_url_follows_current_camera_host(self):
+        from signspeak.web.streamer import _with_current_5g_host
+
+        old = "rtsp://admin:admin123@10.101.0.79:554/avstream/channel=1/stream=1.sdp"
+        self.assertEqual(
+            _with_current_5g_host(old, "10.101.0.82"),
+            "rtsp://admin:admin123@10.101.0.82:554/avstream/channel=1/stream=1.sdp",
+        )
+        # Direct Ethernet and custom streams are never rewritten.
+        eth = "rtsp://admin:admin123@192.168.128.10:554/avstream/channel=1/stream=1.sdp"
+        self.assertEqual(_with_current_5g_host(eth, "10.101.0.82"), eth)
+        custom = "rtsp://user:pw@10.101.0.79:554/live/other"
+        self.assertEqual(_with_current_5g_host(custom, "10.101.0.82"), custom)
+
+    def test_open_abandons_stale_source_after_switch(self):
+        engine = WebStreamEngine(Settings(camera_source="0"))
+        old = "rtsp://admin:admin123@10.101.0.79:554/avstream/channel=1/stream=1.sdp"
+        engine._camera_source = "rtsp://admin:admin123@10.101.0.82:554/avstream/channel=1/stream=1.sdp"
+        with patch("signspeak.web.streamer.cv2.VideoCapture") as capture:
+            self.assertIsNone(engine._open_camera(old))
+        capture.assert_not_called()
