@@ -127,3 +127,94 @@ def build_ssl_context(ips: list[str], cert_file: str | None = None, key_file: st
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(str(cert_path), str(key_path))
     return context
+
+
+# ---------------------------------------------------------------------------
+# One port, HTTPS only: a plain http:// request is answered with a redirect.
+# ---------------------------------------------------------------------------
+import re
+import socket
+
+from werkzeug.serving import ThreadedWSGIServer
+
+_HOST_RE = re.compile(r"^[A-Za-z0-9.\-:\[\]]{1,255}$")
+_TLS_HANDSHAKE = 0x16
+
+
+class HttpsWithRedirectServer(ThreadedWSGIServer):
+    """Threaded Werkzeug server that speaks TLS and redirects plain HTTP.
+
+    The listening socket is not wrapped up front. Each connection's first
+    byte is peeked: a TLS ClientHello (0x16) is wrapped and served normally,
+    anything else is treated as plain HTTP and answered with a 301 to the
+    same URL over https:// on the same port. So typing
+    http://172.16.0.11:18473 lands on https://172.16.0.11:18473.
+    """
+
+    def __init__(self, host: str, port: int, app, ssl_context: ssl.SSLContext) -> None:
+        super().__init__(host, port, app)
+        # Set after init so Werkzeug doesn't wrap the listening socket, while
+        # its request handler still reports wsgi.url_scheme = "https".
+        self.ssl_context = ssl_context
+
+    def finish_request(self, request, client_address) -> None:  # runs in the per-connection thread
+        try:
+            request.settimeout(15)
+            first = request.recv(1, socket.MSG_PEEK)
+        except OSError:
+            return
+        if not first:
+            return
+        if first[0] != _TLS_HANDSHAKE:
+            self._redirect_plain_http(request)
+            return
+        try:
+            tls_sock = self.ssl_context.wrap_socket(request, server_side=True)
+        except (ssl.SSLError, OSError):
+            return  # e.g. the browser rejected the self-signed cert on this attempt
+        try:
+            tls_sock.settimeout(None)
+            super().finish_request(tls_sock, client_address)
+        finally:
+            try:
+                tls_sock.close()
+            except OSError:
+                pass
+
+    def _redirect_plain_http(self, sock) -> None:
+        data = b""
+        try:
+            while b"\r\n\r\n" not in data and len(data) < 16384:
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+                data += chunk
+        except OSError:
+            pass
+        lines = data.split(b"\r\n")
+        try:
+            path = lines[0].split(b" ")[1].decode("latin-1")
+        except IndexError:
+            path = "/"
+        if not path.startswith("/") or any(c in path for c in "\r\n "):
+            path = "/"
+        host = ""
+        for line in lines[1:]:
+            if line.lower().startswith(b"host:"):
+                host = line[5:].strip().decode("latin-1")
+                break
+        if not _HOST_RE.match(host):
+            host = f"{self.server_address[0]}:{self.server_address[1]}"
+        location = f"https://{host}{path}"
+        body = f'<a href="{location}">{location}</a>\n'.encode()
+        response = (
+            "HTTP/1.1 301 Moved Permanently\r\n"
+            f"Location: {location}\r\n"
+            "Content-Type: text/html; charset=utf-8\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        ).encode("latin-1") + body
+        try:
+            sock.sendall(response)
+        except OSError:
+            pass

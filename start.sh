@@ -9,10 +9,10 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=scripts/port.sh
 source scripts/port.sh
 
-# HTTPS (needed for the mic from other machines): ./start.sh --https or WEB_HTTPS=1 in .env
-SCHEME=http
-if [[ " $* " == *" --https "* ]] || grep -qiE '^WEB_HTTPS=(1|true|yes|on)\s*$' .env 2>/dev/null; then
-    SCHEME=https
+# HTTPS is the default (camera/mic need it). Plain HTTP: ./start.sh --http or WEB_HTTPS=0 in .env
+SCHEME=https
+if [[ " $* " == *" --http "* ]] || grep -qiE '^WEB_HTTPS=(0|false|no|off)\s*$' .env 2>/dev/null; then
+    SCHEME=http
 fi
 
 if [[ -f signspeak.pid ]] && kill -0 "$(cat signspeak.pid)" 2>/dev/null; then

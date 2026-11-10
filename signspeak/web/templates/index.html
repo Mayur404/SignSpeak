@@ -2169,7 +2169,7 @@
     async function startBrowserCamera() {
       if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         browserCam.blocked = true;
-        showToast('Laptop camera needs HTTPS: restart SignSpeak with --https, then open https://' + location.host);
+        showToast('Laptop camera needs HTTPS: open https://' + location.host + ' (SignSpeak serves HTTPS unless started with --http)');
         return;
       }
       browserCam.starting = true;
@@ -3168,7 +3168,7 @@
       // Browsers only allow the microphone on https:// or localhost. Opened
       // as http://<vm-ip>:18473 the mic API simply doesn't exist, so say why.
       if (!window.isSecureContext) {
-        showToast('Mic needs HTTPS: restart SignSpeak with --https (or WEB_HTTPS=1 in .env), then open https://' + location.host);
+        showToast('Mic needs HTTPS: open https://' + location.host + ' (SignSpeak serves HTTPS unless started with --http)');
         return;
       }
 

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import ipaddress
+import logging
 import json
 import math
 import os
 import shutil
 import socket
+import ssl
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -39,6 +41,16 @@ def get_network_ips() -> list[str]:
 
 
 MAX_BROWSER_FRAME_BYTES = 3 * 1024 * 1024
+
+
+class _QuietBrowserFrames(logging.Filter):
+    """Keep the ~30 req/s laptop-camera uploads out of the access log."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "/api/browser_frame" not in record.getMessage()
+
+
+logging.getLogger("werkzeug").addFilter(_QuietBrowserFrames())
 
 
 def _is_local_request() -> bool:
@@ -516,21 +528,31 @@ def run_server(
     host: str = "0.0.0.0",
     port: int = 18473,
     engine: WebStreamEngine | None = None,
-    https: bool = False,
+    https: bool = True,
 ) -> None:
-    """Start the SignSpeak Web Server (over self-signed HTTPS if ``https``)."""
+    """Start the SignSpeak Web Server.
+
+    By default the whole app is served over HTTPS (self-signed certificate) on
+    a single port, and plain http:// requests to that port are redirected to
+    https://. Browsers only allow the camera and microphone on secure origins.
+    """
     engine = engine or WebStreamEngine()
     app = create_app(engine)
 
     ips = get_network_ips()
     primary_ip = ips[-1] if len(ips) > 1 else "127.0.0.1"
-    scheme = "https" if https else "http"
     ssl_context = None
     if https:
         from .tls import build_ssl_context
-        ssl_context = build_ssl_context(
-            ips, os.environ.get("WEB_SSL_CERT") or None, os.environ.get("WEB_SSL_KEY") or None
-        )
+        try:
+            ssl_context = build_ssl_context(
+                ips, os.environ.get("WEB_SSL_CERT") or None, os.environ.get("WEB_SSL_KEY") or None
+            )
+        except (RuntimeError, OSError, ssl.SSLError) as exc:
+            print(f"  WARNING: HTTPS unavailable, falling back to plain HTTP: {exc}")
+            print("  (Laptop camera and mic only work over HTTPS from other machines.)")
+    https = ssl_context is not None
+    scheme = "https" if https else "http"
 
     print("=" * 70)
     print("  SignSpeak — 5G Edge Web UI")
@@ -545,16 +567,21 @@ def run_server(
     print(f"  * Camera:           {cam_label}")
     print("=" * 70)
     if https:
-        print("  HTTPS uses a self-signed certificate: accept the browser warning once")
-        print("  (Advanced -> Proceed) and the microphone will work from any machine.")
+        print("  HTTPS on a single port (http:// links redirect to https://).")
+        print("  Self-signed certificate: click Advanced -> Proceed once in the browser;")
+        print("  then the laptop camera and microphone work from any machine.")
     else:
-        print("  Mic needs HTTPS when opened from another machine: restart with --https")
+        print("  Plain HTTP: laptop camera and mic only work on http://localhost.")
     print("  Press Ctrl+C to stop.\n")
 
     try:
         # The project loads .env itself in paths.py; disabling Flask's optional
         # dotenv discovery avoids a misleading python-dotenv startup warning.
-        app.run(host=host, port=port, threaded=True, debug=False, load_dotenv=False, ssl_context=ssl_context)
+        if ssl_context is not None:
+            from .tls import HttpsWithRedirectServer
+            HttpsWithRedirectServer(host, port, app, ssl_context).serve_forever()
+        else:
+            app.run(host=host, port=port, threaded=True, debug=False, load_dotenv=False)
     finally:
         engine.stop()
 

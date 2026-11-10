@@ -123,11 +123,12 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=int(os.environ.get("WEB_PORT", 18473)), help="Port to bind (default: 18473)")
     parser.add_argument("--camera", type=str, default=None, help="Override camera RTSP URL or device index")
     parser.add_argument(
-        "--https",
+        "--http",
         action="store_true",
-        default=os.environ.get("WEB_HTTPS", "").strip().lower() in ("1", "true", "yes", "on"),
-        help="Serve over HTTPS with a self-signed certificate (needed for the mic from other machines)",
+        default=os.environ.get("WEB_HTTPS", "1").strip().lower() in ("0", "false", "no", "off"),
+        help="Serve plain HTTP instead of the default HTTPS (camera/mic then only work on localhost)",
     )
+    parser.add_argument("--https", action="store_true", help=argparse.SUPPRESS)  # old flag; HTTPS is now the default
     parser.add_argument("--no-browser", action="store_true", help="Do not open browser automatically")
 
     # If --desktop is specified, forward to desktop app
@@ -139,7 +140,7 @@ def main() -> int:
         host=args.host,
         port=args.port,
         camera=args.camera,
-        https=args.https,
+        https=args.https or not args.http,
         open_browser=not args.no_browser and "SSH_CONNECTION" not in os.environ and sys.platform == "win32",
     )
 
