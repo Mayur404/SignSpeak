@@ -9,10 +9,16 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=scripts/port.sh
 source scripts/port.sh
 
+# HTTPS (needed for the mic from other machines): ./start.sh --https or WEB_HTTPS=1 in .env
+SCHEME=http
+if [[ " $* " == *" --https "* ]] || grep -qiE '^WEB_HTTPS=(1|true|yes|on)\s*$' .env 2>/dev/null; then
+    SCHEME=https
+fi
+
 if [[ -f signspeak.pid ]] && kill -0 "$(cat signspeak.pid)" 2>/dev/null; then
     PORT=$(cat signspeak.port 2>/dev/null || echo 18473)
     echo "SignSpeak is already running (PID: $(cat signspeak.pid))."
-    for ip in $(hostname -I 2>/dev/null); do echo "  http://$ip:$PORT"; done
+    for ip in $(hostname -I 2>/dev/null); do echo "  $SCHEME://$ip:$PORT"; done
     exit 0
 fi
 
@@ -65,7 +71,8 @@ if kill -0 "$PID" 2>/dev/null; then
     echo "  SignSpeak Web UI is running (PID: $PID)"
     echo "=========================================================="
     echo "  Open one of these from your PC's browser:"
-    for ip in $(hostname -I 2>/dev/null); do echo "    http://$ip:$PORT"; done
+    for ip in $(hostname -I 2>/dev/null); do echo "    $SCHEME://$ip:$PORT"; done
+    [[ "$SCHEME" == https ]] && echo "  (Self-signed certificate: click Advanced -> Proceed once in the browser.)"
     echo "  Camera: $(grep -m1 'Camera:' signspeak.log | sed 's/.*Camera: *//' || true)"
     echo "  Live logs:  tail -f signspeak.log"
     echo "  Stop:       ./stop.sh"

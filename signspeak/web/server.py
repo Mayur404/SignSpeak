@@ -479,32 +479,45 @@ def run_server(
     host: str = "0.0.0.0",
     port: int = 18473,
     engine: WebStreamEngine | None = None,
+    https: bool = False,
 ) -> None:
-    """Start the SignSpeak Web Server."""
+    """Start the SignSpeak Web Server (over self-signed HTTPS if ``https``)."""
     engine = engine or WebStreamEngine()
     app = create_app(engine)
 
     ips = get_network_ips()
     primary_ip = ips[-1] if len(ips) > 1 else "127.0.0.1"
+    scheme = "https" if https else "http"
+    ssl_context = None
+    if https:
+        from .tls import build_ssl_context
+        ssl_context = build_ssl_context(
+            ips, os.environ.get("WEB_SSL_CERT") or None, os.environ.get("WEB_SSL_KEY") or None
+        )
 
     print("=" * 70)
     print("  SignSpeak — 5G Edge Web UI")
     print("=" * 70)
-    print(f"  * Local browser:    http://localhost:{port}")
-    print(f"  * Wi-Fi / LAN:      http://{primary_ip}:{port}")
-    print(f"  * 5G Edge VM (niralos-video): http://172.16.0.11:{port}")
+    print(f"  * Local browser:    {scheme}://localhost:{port}")
+    print(f"  * Wi-Fi / LAN:      {scheme}://{primary_ip}:{port}")
+    print(f"  * 5G Edge VM (niralos-video): {scheme}://172.16.0.11:{port}")
     from ..vision import _safe_camera_source
     cam_src = str(engine._camera_source)
     cam_label = f"webcam {cam_src}" if cam_src.isdigit() else (
         _safe_camera_source(cam_src) if "://" in cam_src else cam_src)
     print(f"  * Camera:           {cam_label}")
     print("=" * 70)
+    if https:
+        print("  HTTPS uses a self-signed certificate: accept the browser warning once")
+        print("  (Advanced -> Proceed) and the microphone will work from any machine.")
+    else:
+        print("  Mic needs HTTPS when opened from another machine: restart with --https")
     print("  Press Ctrl+C to stop.\n")
 
     try:
         # The project loads .env itself in paths.py; disabling Flask's optional
         # dotenv discovery avoids a misleading python-dotenv startup warning.
-        app.run(host=host, port=port, threaded=True, debug=False, load_dotenv=False)
+        app.run(host=host, port=port, threaded=True, debug=False, load_dotenv=False, ssl_context=ssl_context)
     finally:
         engine.stop()
 

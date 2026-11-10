@@ -3082,7 +3082,7 @@
       // Browsers only allow the microphone on https:// or localhost. Opened
       // as http://<vm-ip>:18473 the mic API simply doesn't exist, so say why.
       if (!window.isSecureContext) {
-        showToast('Mic blocked on http://' + location.host + ' - open chrome://flags/#unsafely-treat-insecure-origin-as-secure, add ' + location.origin + ', relaunch Chrome');
+        showToast('Mic needs HTTPS: restart SignSpeak with --https (or WEB_HTTPS=1 in .env), then open https://' + location.host);
         return;
       }
 

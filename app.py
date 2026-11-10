@@ -91,7 +91,7 @@ def run_desktop_app(args: list[str]) -> int:
     return app.exec()
 
 
-def run_web_app(host: str = "0.0.0.0", port: int = 18473, camera: str | None = None, open_browser: bool = True) -> int:
+def run_web_app(host: str = "0.0.0.0", port: int = 18473, camera: str | None = None, open_browser: bool = True, https: bool = False) -> int:
     """Run the SignSpeak Web Server (default port 18473; 8080 is NiralOS)."""
     from signspeak.web.server import run_server
     from signspeak.web.streamer import WebStreamEngine
@@ -104,14 +104,15 @@ def run_web_app(host: str = "0.0.0.0", port: int = 18473, camera: str | None = N
         def _open():
             time.sleep(1.2)
             try:
-                target_url = f"http://localhost:{port}" if host in ("0.0.0.0", "127.0.0.1") else f"http://{host}:{port}"
+                scheme = "https" if https else "http"
+                target_url = f"{scheme}://localhost:{port}" if host in ("0.0.0.0", "127.0.0.1") else f"{scheme}://{host}:{port}"
                 webbrowser.open(target_url)
             except Exception:
                 pass
         threading.Thread(target=_open, daemon=True).start()
 
     engine = WebStreamEngine(settings)
-    run_server(host=host, port=port, engine=engine)
+    run_server(host=host, port=port, engine=engine, https=https)
     return 0
 
 
@@ -121,6 +122,12 @@ def main() -> int:
     parser.add_argument("--host", default=os.environ.get("WEB_HOST", "0.0.0.0"), help="Host to bind (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=int(os.environ.get("WEB_PORT", 18473)), help="Port to bind (default: 18473)")
     parser.add_argument("--camera", type=str, default=None, help="Override camera RTSP URL or device index")
+    parser.add_argument(
+        "--https",
+        action="store_true",
+        default=os.environ.get("WEB_HTTPS", "").strip().lower() in ("1", "true", "yes", "on"),
+        help="Serve over HTTPS with a self-signed certificate (needed for the mic from other machines)",
+    )
     parser.add_argument("--no-browser", action="store_true", help="Do not open browser automatically")
 
     # If --desktop is specified, forward to desktop app
@@ -132,6 +139,7 @@ def main() -> int:
         host=args.host,
         port=args.port,
         camera=args.camera,
+        https=args.https,
         open_browser=not args.no_browser and "SSH_CONNECTION" not in os.environ and sys.platform == "win32",
     )
 

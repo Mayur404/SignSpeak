@@ -267,6 +267,8 @@ class WebStreamEngine:
     def _worker_loop(self) -> None:
         """Main camera acquisition, hand detection, recognition & HUD loop."""
         consecutive_failures = 0
+        open_failures = 0
+        last_failed_source: str | None = None
         last_frame_time = time.monotonic()
         last_good_frame = time.monotonic()
         last_tracker_retry = 0.0
@@ -298,12 +300,27 @@ class WebStreamEngine:
             if self._cap is None:
                 cap = self._open_camera(requested_source)
                 if cap is None:
+                    if requested_source != last_failed_source:
+                        open_failures = 0
+                        last_failed_source = requested_source
+                    open_failures += 1
                     self._camera_connected = False
                     self._last_error = f"Cannot open camera: {_safe_camera_source(requested_source)}"
-                    # Generate animated standby placeholder frame so browser stream stays active
-                    self._render_placeholder_frame("Connecting to camera...", requested_source)
+                    # Generate animated standby placeholder frame so browser stream stays active.
+                    # After a few failed attempts say so plainly instead of "Connecting..."
+                    # forever: on 5G the modem's WAN IP changes on every reconnect.
+                    if open_failures >= 3:
+                        self._render_placeholder_frame(
+                            "Camera not reachable - retrying...",
+                            requested_source,
+                            hint="Check the camera is on, or update the 5G Camera IP in Settings",
+                        )
+                    else:
+                        self._render_placeholder_frame("Connecting to camera...", requested_source)
                     time.sleep(1.0)
                     continue
+                open_failures = 0
+                last_failed_source = None
                 with self._lock:
                     source_is_current = self._camera_source == requested_source
                 if not source_is_current:
@@ -617,7 +634,7 @@ class WebStreamEngine:
             cv2.FONT_HERSHEY_DUPLEX, 0.45, WHITE, 1, cv2.LINE_AA
         )
 
-    def _render_placeholder_frame(self, message: str, source: str) -> None:
+    def _render_placeholder_frame(self, message: str, source: str, hint: str | None = None) -> None:
         """Create a futuristic standby placeholder frame when camera is offline."""
         w, h = 960, 540
         frame = np.zeros((h, w, 3), dtype=np.uint8)
@@ -648,6 +665,9 @@ class WebStreamEngine:
         src_text = f"Target: {_safe_camera_source(source)}"
         (sw, _), _ = cv2.getTextSize(src_text, font, 0.5, 1)
         cv2.putText(frame, src_text, (w // 2 - sw // 2, h // 2 + 60), font, 0.5, GRAY, 1, cv2.LINE_AA)
+        if hint:
+            (hw, _), _ = cv2.getTextSize(hint, font, 0.45, 1)
+            cv2.putText(frame, hint, (w // 2 - hw // 2, h // 2 + 88), font, 0.45, ACCENT_CYAN, 1, cv2.LINE_AA)
 
         ret, jpeg_bytes = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
         if ret:

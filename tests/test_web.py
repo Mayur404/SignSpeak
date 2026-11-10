@@ -130,7 +130,7 @@ class WebAppTestCase(unittest.TestCase):
             )
         engine_type.assert_called_once_with(settings)
         run_server.assert_called_once_with(
-            host="0.0.0.0", port=18473, engine=engine_type.return_value
+            host="0.0.0.0", port=18473, engine=engine_type.return_value, https=False
         )
         self.assertEqual(settings.camera_source, camera)
 
